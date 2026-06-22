@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+[Tt]est[Rr]esults/
+coverage/
+*.coverage
+*.trx
+.env
+appsettings.*.Local.json
