@@ -11,6 +11,7 @@ public sealed class OrdemServicoConfiguration : IEntityTypeConfiguration<OrdemSe
     {
         b.ToTable("OrdensServico");
         b.HasKey(o => o.Id);
+        b.Property(o => o.Id).ValueGeneratedNever();
 
         b.Property(o => o.ClienteId).IsRequired();
         b.Property(o => o.VeiculoId).IsRequired();
@@ -23,12 +24,12 @@ public sealed class OrdemServicoConfiguration : IEntityTypeConfiguration<OrdemSe
         b.Property(o => o.EntregueEm);
         b.Property(o => o.CanceladaEm);
 
-        b.Ignore(o => o.TempoExecucao);   // calculado, nao persistido
+        b.Ignore(o => o.TempoExecucao);
 
         b.HasIndex(o => o.Status);
         b.HasIndex(o => o.ClienteId);
 
-        // Orcamento como objeto owned (mesma tabela, colunas prefixadas)
+        // Orcamento: owned na mesma tabela (colunas prefixadas) - funciona bem (nao e colecao)
         b.OwnsOne(o => o.Orcamento, ob =>
         {
             ob.Property(x => x.ValorServicos).HasConversion(Converters.Money).HasColumnType("numeric(18,2)").HasColumnName("Orcamento_ValorServicos");
@@ -38,34 +39,11 @@ public sealed class OrdemServicoConfiguration : IEntityTypeConfiguration<OrdemSe
             ob.Property(x => x.GeradoEm).HasColumnName("Orcamento_GeradoEm");
         });
 
-        // Itens de servico como entidades owned (tabela propria, acesso por field)
-        b.OwnsMany(o => o.Servicos, sb =>
-        {
-            sb.ToTable("ItensServico");
-            sb.WithOwner().HasForeignKey("OrdemServicoId");
-            sb.HasKey(i => i.Id);
-            sb.Property(i => i.ServicoId).IsRequired();
-            sb.Property(i => i.Descricao).HasMaxLength(300);
-            sb.Property(i => i.TempoEstimado).IsRequired();
-            sb.Property(i => i.Executado).IsRequired();
-            sb.Property(i => i.Valor).HasConversion(Converters.Money).HasColumnType("numeric(18,2)").IsRequired();
-            sb.UsePropertyAccessMode(PropertyAccessMode.Field);
-        });
+        // Itens como entidades normais (relacao 1-N). Mesmo schema das tabelas anteriores.
+        b.HasMany(o => o.Servicos).WithOne().HasForeignKey("OrdemServicoId").OnDelete(DeleteBehavior.Cascade);
         b.Navigation(o => o.Servicos).UsePropertyAccessMode(PropertyAccessMode.Field);
 
-        // Itens de peca como entidades owned
-        b.OwnsMany(o => o.Pecas, pb =>
-        {
-            pb.ToTable("ItensPeca");
-            pb.WithOwner().HasForeignKey("OrdemServicoId");
-            pb.HasKey(i => i.Id);
-            pb.Property(i => i.PecaId).IsRequired();
-            pb.Property(i => i.Quantidade).IsRequired();
-            pb.Property(i => i.Utilizado).IsRequired();
-            pb.Property(i => i.ValorUnitario).HasConversion(Converters.Money).HasColumnType("numeric(18,2)").IsRequired();
-            pb.Ignore(i => i.Subtotal);
-            pb.UsePropertyAccessMode(PropertyAccessMode.Field);
-        });
+        b.HasMany(o => o.Pecas).WithOne().HasForeignKey("OrdemServicoId").OnDelete(DeleteBehavior.Cascade);
         b.Navigation(o => o.Pecas).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

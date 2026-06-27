@@ -111,8 +111,7 @@ public sealed class OrdemServicoService
         peca.Baixar(item.Quantidade);     // pode lancar DomainException (estoque insuficiente) -> 400
         os.RegistrarUsoPeca(itemId);       // valida status EmExecucao
 
-        _pecas.Update(peca);
-        _repo.Update(os);
+        // entidades ja rastreadas pelo DbContext: o change tracker persiste sozinho
         await _uow.SaveChangesAsync(ct);   // ambos confirmados na mesma unidade de trabalho
         return Map(os);
     }
@@ -163,7 +162,7 @@ public sealed class OrdemServicoService
     {
         var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Ordem de servico nao encontrada.");
         acao(os);
-        _repo.Update(os);
+        // entidade rastreada: nao chamar Update (marcaria itens novos como Modified -> erro)
         await _uow.SaveChangesAsync(ct);
         return Map(os);
     }

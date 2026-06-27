@@ -8,15 +8,17 @@ public sealed class OrdemServicoRepository : EfRepository<OrdemServico>, IOrdemS
 {
     public OrdemServicoRepository(OficinaDbContext db) : base(db) { }
 
-    // Owned types (itens/orcamento) sao incluidos automaticamente pelo EF.
+    private IQueryable<OrdemServico> ComItens()
+        => Db.OrdensServico.Include(o => o.Servicos).Include(o => o.Pecas);
+
     public override Task<OrdemServico?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => Db.OrdensServico.FirstOrDefaultAsync(o => o.Id == id, ct);
+        => ComItens().FirstOrDefaultAsync(o => o.Id == id, ct);
 
     public override Task<List<OrdemServico>> ListAsync(CancellationToken ct = default)
-        => Db.OrdensServico.OrderByDescending(o => o.CriadaEm).ToListAsync(ct);
+        => ComItens().OrderByDescending(o => o.CriadaEm).ToListAsync(ct);
 
     public Task<List<OrdemServico>> ListByStatusAsync(StatusOS status, CancellationToken ct = default)
-        => Db.OrdensServico.Where(o => o.Status == status).ToListAsync(ct);
+        => ComItens().Where(o => o.Status == status).ToListAsync(ct);
 
     public Task<List<OrdemServico>> ListFinalizadasOuEntreguesAsync(CancellationToken ct = default)
         => Db.OrdensServico
