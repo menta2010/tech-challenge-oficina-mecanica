@@ -13,20 +13,25 @@ acompanhamento da OS pelo cliente.
 - xUnit + FluentAssertions + WebApplicationFactory + Testcontainers
 - Docker / docker-compose
 
+## Links
+
+- **Event Storming (board no Miro):** https://miro.com/app/board/uXjVHDVaKxg=/?share_link_id=818426939332
+
 ## Arquitetura (camadas + DDD)
 
-```
-Oficina.API            -> controllers REST, Swagger, JWT, middleware de erros, DI
-   -> Oficina.Application  -> casos de uso (services), DTOs, validacao (FluentValidation)
-       -> Oficina.Domain   -> entidades, Value Objects, enums, regras (sem dependencias)
-Oficina.Infrastructure -> EF Core, repositorios, UnitOfWork, JWT, seed (implementa interfaces)
-tests/Oficina.UnitTests / tests/Oficina.IntegrationTests
-```
+Camadas, da mais externa para o nucleo:
 
-Regra de dependencia: o Domain nao referencia nada; a API so conhece a Infrastructure
-via injecao de dependencia. As regras de negocio e a maquina de estados da OS ficam no
-agregado `OrdemServico` (o `Orcamento` e os itens de servico/peca sao partes internas do
-agregado, persistidos como entidades filhas 1-N).
+- **Oficina.API** - controllers REST, Swagger, JWT, middleware de erros, injecao de dependencia.
+- **Oficina.Application** - casos de uso (services), DTOs e validacao (FluentValidation).
+- **Oficina.Domain** - entidades, Value Objects, enums e regras de negocio (sem dependencias).
+- **Oficina.Infrastructure** - EF Core, repositorios, UnitOfWork, JWT e seed (implementa as interfaces da Application).
+- **tests/** - `Oficina.UnitTests` (dominio) e `Oficina.IntegrationTests` (API + Postgres).
+
+Fluxo de dependencia: API -> Application -> Domain. A Infrastructure implementa as interfaces
+da Application e e injetada na API; o Domain nao referencia nenhuma outra camada.
+
+As regras de negocio e a maquina de estados da OS ficam no agregado `OrdemServico` (o `Orcamento`
+e os itens de servico/peca sao partes internas do agregado, persistidos como entidades filhas 1-N).
 
 ## Como rodar
 
@@ -161,7 +166,6 @@ Detalhes e evidencias (antes/depois) em `docs/RELATORIO-VULNERABILIDADES.md`.
 
 ## Documentacao do projeto
 
-- **Event Storming (Miro):** https://miro.com/app/board/uXjVHDVaKxg=/?share_link_id=818426939332
 - `DDD-Oficina-Mecanica.md` - Event Storming, bounded contexts, agregados e linguagem ubiqua.
 - `docs/Documentacao-Tecnica-Oficina.docx` - documentacao tecnica consolidada (arquitetura,
   testes, qualidade e seguranca).
