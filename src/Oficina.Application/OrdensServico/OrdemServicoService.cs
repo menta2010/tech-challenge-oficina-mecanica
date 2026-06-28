@@ -11,6 +11,7 @@ namespace Oficina.Application.OrdensServico;
 /// </summary>
 public sealed class OrdemServicoService
 {
+    private const string OsNaoEncontrada = "Ordem de servico nao encontrada.";
     private readonly IOrdemServicoRepository _repo;
     private readonly IClienteRepository _clientes;
     private readonly IVeiculoRepository _veiculos;
@@ -99,7 +100,7 @@ public sealed class OrdemServicoService
     /// </summary>
     public async Task<OrdemServicoResponse> UsarPecaAsync(Guid id, Guid itemId, CancellationToken ct = default)
     {
-        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Ordem de servico nao encontrada.");
+        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(OsNaoEncontrada);
         var item = os.Pecas.FirstOrDefault(p => p.Id == itemId)
                    ?? throw new NotFoundException("Item de peca nao encontrado na OS.");
         if (item.Utilizado)
@@ -126,7 +127,7 @@ public sealed class OrdemServicoService
     // --- Consultas ---
     public async Task<OrdemServicoResponse> ObterAsync(Guid id, CancellationToken ct = default)
     {
-        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Ordem de servico nao encontrada.");
+        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(OsNaoEncontrada);
         return Map(os);
     }
 
@@ -141,7 +142,7 @@ public sealed class OrdemServicoService
     /// <summary>Consulta publica de andamento pelo cliente (nao altera estado).</summary>
     public async Task<AcompanhamentoResponse> AcompanharAsync(Guid id, CancellationToken ct = default)
     {
-        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Ordem de servico nao encontrada.");
+        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(OsNaoEncontrada);
         return new AcompanhamentoResponse(os.Id, os.Status.ToString(), os.Orcamento?.PrevisaoEntrega, os.CriadaEm);
     }
 
@@ -160,7 +161,7 @@ public sealed class OrdemServicoService
     // --- internos ---
     private async Task<OrdemServicoResponse> MutarAsync(Guid id, Action<OrdemServico> acao, CancellationToken ct)
     {
-        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Ordem de servico nao encontrada.");
+        var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(OsNaoEncontrada);
         acao(os);
         // entidade rastreada: nao chamar Update (marcaria itens novos como Modified -> erro)
         await _uow.SaveChangesAsync(ct);

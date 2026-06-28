@@ -51,7 +51,9 @@ public static class DbInitializer
         if (!await db.Usuarios.AnyAsync(ct))
         {
             var hasher = new Pbkdf2PasswordHasher();
-            db.Usuarios.Add(new Usuario("admin", hasher.Hash("admin123"), "Admin"));
+            // senha do seed via variavel de ambiente; fallback apenas para ambiente de desenvolvimento
+            var senhaAdmin = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD") ?? "admin123";
+            db.Usuarios.Add(new Usuario("admin", hasher.Hash(senhaAdmin), "Admin"));
         }
 
         await db.SaveChangesAsync(ct);

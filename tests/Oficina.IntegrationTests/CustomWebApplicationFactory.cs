@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Oficina.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -31,12 +33,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, cfg) =>
+
+        // Substitui o DbContext registrado pelo app para apontar ao banco do Testcontainers.
+        // Feito em ConfigureServices (roda DEPOIS do registro do app), garantindo a troca.
+        builder.ConfigureServices(services =>
         {
-            cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:Default"] = _db.GetConnectionString()
-            });
+            var descriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(DbContextOptions<OficinaDbContext>));
+            if (descriptor is not null)
+                services.Remove(descriptor);
+
+            services.AddDbContext<OficinaDbContext>(options =>
+                options.UseNpgsql(_db.GetConnectionString()));
         });
     }
 }

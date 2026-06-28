@@ -35,7 +35,7 @@ public class OrdemServicoFlowTests
         // Catalogo (seed): pega um servico e uma peca com estoque
         var servicos = await client.GetFromJsonAsync<List<ServicoResponse>>("/api/servicos");
         var pecas = await client.GetFromJsonAsync<List<PecaInsumoResponse>>("/api/pecas-insumos");
-        var servico = servicos!.First();
+        var servico = servicos![0];
         var peca = pecas!.First(p => p.QuantidadeEmEstoque > 0);
         var estoqueInicial = peca.QuantidadeEmEstoque;
 
@@ -66,11 +66,11 @@ public class OrdemServicoFlowTests
         os.Status.Should().Be("EmExecucao");
 
         // Executar servico e usar peca (baixa estoque)
-        var itemServicoId = os.Servicos.First().Id;
-        var itemPecaId = os.Pecas.First().Id;
+        var itemServicoId = os.Servicos[0].Id;
+        var itemPecaId = os.Pecas[0].Id;
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/servicos/{itemServicoId}/executar", new { });
         os = await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/pecas/{itemPecaId}/usar", new { });
-        os.Pecas.First().Utilizado.Should().BeTrue();
+        os.Pecas[0].Utilizado.Should().BeTrue();
 
         // Estoque deve ter sido baixado em 1
         var pecaApos = await client.GetFromJsonAsync<PecaInsumoResponse>($"/api/pecas-insumos/{peca.Id}");
@@ -113,14 +113,14 @@ public class OrdemServicoFlowTests
             new CriarOrdemServicoRequest(cliente.Id, veiculo.Id));
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/iniciar-diagnostico", new { });
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/servicos",
-            new AdicionarServicoRequest(servicos!.First().Id));
+            new AdicionarServicoRequest(servicos![0].Id));
         // pede 2 de uma peca que so tem 1
         os = await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/pecas",
             new AdicionarPecaRequest(peca.Id, 2));
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/finalizar-diagnostico", new { });
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/aprovar", new { });
 
-        var itemPecaId = os.Pecas.First().Id;
+        var itemPecaId = os.Pecas[0].Id;
         var resp = await client.PostAsJsonAsync($"/api/ordens-servico/{os.Id}/pecas/{itemPecaId}/usar", new { });
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest); // estoque insuficiente
     }

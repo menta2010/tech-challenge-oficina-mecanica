@@ -1,11 +1,41 @@
+## --- .NET ---
 bin/
 obj/
-.vs/
+[Bb]in/
+[Oo]bj/
 *.user
 *.suo
+*.userosscache
+*.dbmdl
+.vs/
+
+## --- Testes / cobertura ---
 [Tt]est[Rr]esults/
 coverage/
+coverage*.xml
+*.cobertura.xml
 *.coverage
 *.trx
+TestResults*/
+
+## --- SonarQube ---
+.sonarqube/
+.sonar/
+.scannerwork/
+
+## --- Build / publish ---
+[Dd]ebug/
+[Rr]elease/
+publish/
+*.dll.config
+
+## --- Segredos / ambiente ---
 .env
 appsettings.*.Local.json
+
+## --- Scripts internos (nao versionar) ---
+scripts/security-scan.sh
+
+## --- Diversos ---
+*.lnk
+*.log

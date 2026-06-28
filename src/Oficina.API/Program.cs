@@ -70,7 +70,10 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-app.Run();
+await app.RunAsync();
 
 // Necessario para WebApplicationFactory nos testes de integracao
-public partial class Program { }
+public partial class Program
+{
+    protected Program() { }
+}

@@ -14,10 +14,13 @@ RUN dotnet restore src/Oficina.API/Oficina.API.csproj
 COPY . .
 RUN dotnet publish src/Oficina.API/Oficina.API.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-# ---------- runtime ----------
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+# ---------- runtime (chiseled: imagem minima, sem shell/SO completo) ----------
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-chiseled AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+
+# Usuario nao-root explicito (hardening - resolve o hotspot do SonarQube)
+USER $APP_UID
 
 ENV ASPNETCORE_ENVIRONMENT=Docker
 ENV ASPNETCORE_URLS=http://+:8080

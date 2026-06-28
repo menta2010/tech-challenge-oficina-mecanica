@@ -9,6 +9,7 @@ namespace Oficina.Application.Estoque;
 /// <summary>Casos de uso de Peca/Insumo. Atende ao CRUD com controle de estoque (incluindo reabastecimento).</summary>
 public sealed class PecaInsumoService
 {
+    private const string NaoEncontrado = "Peca/insumo nao encontrado.";
     private readonly IPecaInsumoRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly IValidator<CreatePecaInsumoRequest> _createValidator;
@@ -39,7 +40,7 @@ public sealed class PecaInsumoService
     public async Task<PecaInsumoResponse> AtualizarAsync(Guid id, UpdatePecaInsumoRequest req, CancellationToken ct = default)
     {
         await _updateValidator.ValidateAndThrowAsync(req, ct);
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Peca/insumo nao encontrado.");
+        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
         peca.Atualizar(req.Nome, Money.From(req.ValorUnitario));
         _repo.Update(peca);
         await _uow.SaveChangesAsync(ct);
@@ -49,7 +50,7 @@ public sealed class PecaInsumoService
     public async Task<PecaInsumoResponse> ReabastecerAsync(Guid id, ReabastecerEstoqueRequest req, CancellationToken ct = default)
     {
         await _reabastecerValidator.ValidateAndThrowAsync(req, ct);
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Peca/insumo nao encontrado.");
+        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
         peca.Repor(req.Quantidade);
         _repo.Update(peca);
         await _uow.SaveChangesAsync(ct);
@@ -58,7 +59,7 @@ public sealed class PecaInsumoService
 
     public async Task<PecaInsumoResponse> ObterAsync(Guid id, CancellationToken ct = default)
     {
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Peca/insumo nao encontrado.");
+        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
         return Map(peca);
     }
 
@@ -67,7 +68,7 @@ public sealed class PecaInsumoService
 
     public async Task RemoverAsync(Guid id, CancellationToken ct = default)
     {
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Peca/insumo nao encontrado.");
+        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
         _repo.Remove(peca);
         await _uow.SaveChangesAsync(ct);
     }

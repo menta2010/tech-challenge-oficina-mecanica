@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+      * {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      h1 {
+        text-align: center;
+      }
+      .group-header th {
+        font-size: 200%;
+      }
+      .sub-header th {
+        font-size: 150%;
+      }
+      table, th, td {
+        border: 1px solid black;
+        border-collapse: collapse;
+        white-space: nowrap;
+        padding: .3em;
+      }
+      table {
+        margin: 0 auto;
+      }
+      .severity {
+        text-align: center;
+        font-weight: bold;
+        color: #fafafa;
+      }
+      .severity-LOW .severity { background-color: #5fbb31; }
+      .severity-MEDIUM .severity { background-color: #e9c600; }
+      .severity-HIGH .severity { background-color: #ff8800; }
+      .severity-CRITICAL .severity { background-color: #e40000; }
+      .severity-UNKNOWN .severity { background-color: #747474; }
+      .severity-LOW { background-color: #5fbb3160; }
+      .severity-MEDIUM { background-color: #e9c60060; }
+      .severity-HIGH { background-color: #ff880060; }
+      .severity-CRITICAL { background-color: #e4000060; }
+      .severity-UNKNOWN { background-color: #74747460; }
+      table tr td:first-of-type {
+        font-weight: bold;
+      }
+      .links a,
+      .links[data-more-links=on] a {
+        display: block;
+      }
+      .links[data-more-links=off] a:nth-of-type(1n+5) {
+        display: none;
+      }
+      a.toggle-more-links { cursor: pointer; }
+    </style>
+    <title>oficina-api (ubuntu 22.04) - Trivy Report - 2026-06-28 01:23:43.615558711 +0000 UTC m=+19.875767675 </title>
+    <script>
+      window.onload = function() {
+        document.querySelectorAll('td.links').forEach(function(linkCell) {
+          var links = [].concat.apply([], linkCell.querySelectorAll('a'));
+          [].sort.apply(links, function(a, b) {
+            return a.href > b.href ? 1 : -1;
+          });
+          links.forEach(function(link, idx) {
+            if (links.length > 3 && 3 === idx) {
+              var toggleLink = document.createElement('a');
+              toggleLink.innerText = "Toggle more links";
+              toggleLink.href = "#toggleMore";
+              toggleLink.setAttribute("class", "toggle-more-links");
+              linkCell.appendChild(toggleLink);
+            }
+            linkCell.appendChild(link);
+          });
+        });
+        document.querySelectorAll('a.toggle-more-links').forEach(function(toggleLink) {
+          toggleLink.onclick = function() {
+            var expanded = toggleLink.parentElement.getAttribute("data-more-links");
+            toggleLink.parentElement.setAttribute("data-more-links", "on" === expanded ? "off" : "on");
+            return false;
+          };
+        });
+      };
+    </script>
+  </head>
+  <body>
+    <h1>oficina-api (ubuntu 22.04) - Trivy Report - 2026-06-28 01:23:43.617824935 +0000 UTC m=+19.878033999</h1>
+    <table>
+      <tr class="group-header"><th colspan="6">ubuntu</th></tr>
+      <tr class="sub-header">
+        <th>Package</th>
+        <th>Vulnerability ID</th>
+        <th>Severity</th>
+        <th>Installed Version</th>
+        <th>Fixed Version</th>
+        <th>Links</th>
+      </tr>
+      <tr class="severity-LOW">
+        <td class="pkg-name">gcc-12-base</td>
+        <td>CVE-2022-27943</td>
+        <td class="severity">LOW</td>
+        <td class="pkg-version">12.3.0-1ubuntu1~22.04.3</td>
+        <td></td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2022-27943">https://access.redhat.com/security/cve/CVE-2022-27943</a>
+          <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105039">https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105039</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=1a770b01ef415e114164b6151d1e55acdee09371">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=1a770b01ef415e114164b6151d1e55acdee09371</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=9234cdca6ee88badfc00297e72f13dac4e540c79">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=9234cdca6ee88badfc00297e72f13dac4e540c79</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=fc968115a742d9e4674d9725ce9c2106b91b6ead">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=fc968115a742d9e4674d9725ce9c2106b91b6ead</a>
+          <a href="https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592244.html">https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592244.html</a>
+          <a href="https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H424YXGW7OKXS2NCAP35OP6Y4P4AW6VG/">https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H424YXGW7OKXS2NCAP35OP6Y4P4AW6VG/</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2022-27943">https://nvd.nist.gov/vuln/detail/CVE-2022-27943</a>
+          <a href="https://sourceware.org/bugzilla/show_bug.cgi?id=28995">https://sourceware.org/bugzilla/show_bug.cgi?id=28995</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2022-27943">https://www.cve.org/CVERecord?id=CVE-2022-27943</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">libc6</td>
+        <td>CVE-2026-4046</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">2.35-0ubuntu3.13</td>
+        <td></td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/errata/RHSA-2026:20587">https://access.redhat.com/errata/RHSA-2026:20587</a>
+          <a href="https://access.redhat.com/security/cve/CVE-2026-4046">https://access.redhat.com/security/cve/CVE-2026-4046</a>
+          <a href="https://bugzilla.redhat.com/2453117">https://bugzilla.redhat.com/2453117</a>
+          <a href="https://bugzilla.redhat.com/show_bug.cgi?id=2453117">https://bugzilla.redhat.com/show_bug.cgi?id=2453117</a>
+          <a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-4046">https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-4046</a>
+          <a href="https://errata.almalinux.org/8/ALSA-2026-20587.html">https://errata.almalinux.org/8/ALSA-2026-20587.html</a>
+          <a href="https://errata.rockylinux.org/RLSA-2026:20587">https://errata.rockylinux.org/RLSA-2026:20587</a>
+          <a href="https://inbox.sourceware.org/libc-announce/76814edf-cf7f-47ec-979d-2dce0a2c76bf@gotplt.org/T/#u">https://inbox.sourceware.org/libc-announce/76814edf-cf7f-47ec-979d-2dce0a2c76bf@gotplt.org/T/#u</a>
+          <a href="https://linux.oracle.com/cve/CVE-2026-4046.html">https://linux.oracle.com/cve/CVE-2026-4046.html</a>
+          <a href="https://linux.oracle.com/errata/ELSA-2026-50291.html">https://linux.oracle.com/errata/ELSA-2026-50291.html</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2026-4046">https://nvd.nist.gov/vuln/detail/CVE-2026-4046</a>
+          <a href="https://packages.fedoraproject.org/pkgs/glibc/glibc-gconv-extra/">https://packages.fedoraproject.org/pkgs/glibc/glibc-gconv-extra/</a>
+          <a href="https://sourceware.org/bugzilla/show_bug.cgi?id=33980">https://sourceware.org/bugzilla/show_bug.cgi?id=33980</a>
+          <a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0007">https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0007</a>
+          <a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0007;hb=HEAD">https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0007;hb=HEAD</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2026-4046">https://www.cve.org/CVERecord?id=CVE-2026-4046</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">libc6</td>
+        <td>CVE-2026-5435</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">2.35-0ubuntu3.13</td>
+        <td></td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2026-5435">https://access.redhat.com/security/cve/CVE-2026-5435</a>
+          <a href="https://inbox.sourceware.org/libc-alpha/cover.1777546194.git.fweimer@redhat.com/">https://inbox.sourceware.org/libc-alpha/cover.1777546194.git.fweimer@redhat.com/</a>
+          <a href="https://inbox.sourceware.org/libc-announce/7a655d55-276f-41fe-b550-feb3ebb2ce91@redhat.com/T/#u">https://inbox.sourceware.org/libc-announce/7a655d55-276f-41fe-b550-feb3ebb2ce91@redhat.com/T/#u</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2026-5435">https://nvd.nist.gov/vuln/detail/CVE-2026-5435</a>
+          <a href="https://sourceware.org/bugzilla/show_bug.cgi?id=34033">https://sourceware.org/bugzilla/show_bug.cgi?id=34033</a>
+          <a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0011">https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0011</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2026-5435">https://www.cve.org/CVERecord?id=CVE-2026-5435</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">libc6</td>
+        <td>CVE-2026-6238</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">2.35-0ubuntu3.13</td>
+        <td></td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2026-6238">https://access.redhat.com/security/cve/CVE-2026-6238</a>
+          <a href="https://inbox.sourceware.org/libc-alpha/cover.1777546194.git.fweimer@redhat.com/">https://inbox.sourceware.org/libc-alpha/cover.1777546194.git.fweimer@redhat.com/</a>
+          <a href="https://inbox.sourceware.org/libc-announce/7a655d55-276f-41fe-b550-feb3ebb2ce91@redhat.com/T/#u">https://inbox.sourceware.org/libc-announce/7a655d55-276f-41fe-b550-feb3ebb2ce91@redhat.com/T/#u</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2026-6238">https://nvd.nist.gov/vuln/detail/CVE-2026-6238</a>
+          <a href="https://sourceware.org/bugzilla/show_bug.cgi?id=34069">https://sourceware.org/bugzilla/show_bug.cgi?id=34069</a>
+          <a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0012">https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0012</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2026-6238">https://www.cve.org/CVERecord?id=CVE-2026-6238</a>
+        </td>
+      </tr>
+      <tr class="severity-LOW">
+        <td class="pkg-name">libgcc-s1</td>
+        <td>CVE-2022-27943</td>
+        <td class="severity">LOW</td>
+        <td class="pkg-version">12.3.0-1ubuntu1~22.04.3</td>
+        <td></td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2022-27943">https://access.redhat.com/security/cve/CVE-2022-27943</a>
+          <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105039">https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105039</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=1a770b01ef415e114164b6151d1e55acdee09371">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=1a770b01ef415e114164b6151d1e55acdee09371</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=9234cdca6ee88badfc00297e72f13dac4e540c79">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=9234cdca6ee88badfc00297e72f13dac4e540c79</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=fc968115a742d9e4674d9725ce9c2106b91b6ead">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=fc968115a742d9e4674d9725ce9c2106b91b6ead</a>
+          <a href="https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592244.html">https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592244.html</a>
+          <a href="https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H424YXGW7OKXS2NCAP35OP6Y4P4AW6VG/">https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H424YXGW7OKXS2NCAP35OP6Y4P4AW6VG/</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2022-27943">https://nvd.nist.gov/vuln/detail/CVE-2022-27943</a>
+          <a href="https://sourceware.org/bugzilla/show_bug.cgi?id=28995">https://sourceware.org/bugzilla/show_bug.cgi?id=28995</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2022-27943">https://www.cve.org/CVERecord?id=CVE-2022-27943</a>
+        </td>
+      </tr>
+      <tr class="severity-LOW">
+        <td class="pkg-name">libstdc++6</td>
+        <td>CVE-2022-27943</td>
+        <td class="severity">LOW</td>
+        <td class="pkg-version">12.3.0-1ubuntu1~22.04.3</td>
+        <td></td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2022-27943">https://access.redhat.com/security/cve/CVE-2022-27943</a>
+          <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105039">https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105039</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=1a770b01ef415e114164b6151d1e55acdee09371">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=1a770b01ef415e114164b6151d1e55acdee09371</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=9234cdca6ee88badfc00297e72f13dac4e540c79">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=9234cdca6ee88badfc00297e72f13dac4e540c79</a>
+          <a href="https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=fc968115a742d9e4674d9725ce9c2106b91b6ead">https://gcc.gnu.org/git/gitweb.cgi?p=gcc.git;h=fc968115a742d9e4674d9725ce9c2106b91b6ead</a>
+          <a href="https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592244.html">https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592244.html</a>
+          <a href="https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H424YXGW7OKXS2NCAP35OP6Y4P4AW6VG/">https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H424YXGW7OKXS2NCAP35OP6Y4P4AW6VG/</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2022-27943">https://nvd.nist.gov/vuln/detail/CVE-2022-27943</a>
+          <a href="https://sourceware.org/bugzilla/show_bug.cgi?id=28995">https://sourceware.org/bugzilla/show_bug.cgi?id=28995</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2022-27943">https://www.cve.org/CVERecord?id=CVE-2022-27943</a>
+        </td>
+      </tr>
+      <tr><th colspan="6">No Misconfigurations found</th></tr>
+      <tr class="group-header"><th colspan="6">dotnet-core</th></tr>
+      <tr><th colspan="6">No Vulnerabilities found</th></tr>
+      <tr><th colspan="6">No Misconfigurations found</th></tr>
+      <tr class="group-header"><th colspan="6">dotnet-core</th></tr>
+      <tr><th colspan="6">No Vulnerabilities found</th></tr>
+      <tr><th colspan="6">No Misconfigurations found</th></tr>
+      <tr class="group-header"><th colspan="6">dotnet-core</th></tr>
+      <tr><th colspan="6">No Vulnerabilities found</th></tr>
+      <tr><th colspan="6">No Misconfigurations found</th></tr>
+    </table>
+  </body>
+</html>
