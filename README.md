@@ -1,7 +1,8 @@
 # Oficina Mecanica - Sistema Integrado de Atendimento e Execucao de Servicos
 
-MVP back-end (monolito em camadas, DDD) do Tech Challenge FIAP/Pos Tech - Fase 1.
-Gestao de Ordens de Servico, clientes, veiculos, servicos, pecas/insumos e acompanhamento da OS pelo cliente.
+MVP back-end (monolito em camadas, DDD) do Tech Challenge FIAP / Pos Tech - Fase 1.
+Gestao de Ordens de Servico (OS), clientes, veiculos, servicos, pecas/insumos e
+acompanhamento da OS pelo cliente.
 
 ## Stack
 
@@ -10,34 +11,44 @@ Gestao de Ordens de Servico, clientes, veiculos, servicos, pecas/insumos e acomp
 - Swagger / OpenAPI
 - JWT Bearer (APIs administrativas)
 - xUnit + FluentAssertions + WebApplicationFactory + Testcontainers
+- Docker / docker-compose
 
-## Arquitetura (camadas)
+## Arquitetura (camadas + DDD)
 
 ```
-Oficina.API            -> controllers, Swagger, JWT, DI
-   -> Oficina.Application  -> casos de uso, DTOs, validators
-       -> Oficina.Domain   -> entidades, VOs, enums, regras (sem dependencias)
-Oficina.Infrastructure -> EF Core, repositorios, migrations (implementa interfaces)
+Oficina.API            -> controllers REST, Swagger, JWT, middleware de erros, DI
+   -> Oficina.Application  -> casos de uso (services), DTOs, validacao (FluentValidation)
+       -> Oficina.Domain   -> entidades, Value Objects, enums, regras (sem dependencias)
+Oficina.Infrastructure -> EF Core, repositorios, UnitOfWork, JWT, seed (implementa interfaces)
 tests/Oficina.UnitTests / tests/Oficina.IntegrationTests
 ```
 
-Regra de dependencia: Domain nao referencia nada; API so conhece Infrastructure via injecao.
+Regra de dependencia: o Domain nao referencia nada; a API so conhece a Infrastructure
+via injecao de dependencia. As regras de negocio e a maquina de estados da OS ficam no
+agregado `OrdemServico` (o `Orcamento` e os itens de servico/peca sao partes internas do
+agregado, persistidos como entidades filhas 1-N).
 
 ## Como rodar
 
-### Opcao 1 - Docker (ambiente completo: API + Postgres)
+### Opcao 1 - Docker (recomendado: API + Postgres juntos)
+
+Pre-requisito: Docker Desktop em execucao.
 
 ```bash
 docker compose up --build
 ```
 
-- API: http://localhost:8080
-- Swagger: http://localhost:8080/swagger
-- Health: http://localhost:8080/health
+- API:     http://localhost:8080
+- Swagger:  http://localhost:8080/swagger
+- Health:   http://localhost:8080/health
+
+No primeiro start o schema e os seeds (catalogo de servicos, estoque e usuario admin)
+sao criados automaticamente.
 
 ### Opcao 2 - Local (dotnet)
 
-Pre-requisitos: .NET 8 SDK e um Postgres acessivel (ajuste `ConnectionStrings:Default` em `appsettings.json`).
+Pre-requisitos: .NET 8 SDK e um Postgres acessivel (ajuste `ConnectionStrings:Default`
+em `appsettings.json`). Dica: suba so o banco com `docker compose up -d db`.
 
 ```bash
 dotnet restore
@@ -46,19 +57,12 @@ dotnet run --project src/Oficina.API
 ```
 
 - Swagger: http://localhost:5080/swagger
-- Health: http://localhost:5080/health
-
-## Documentacao do projeto
-
-- `DDD-Oficina-Mecanica.md` — Event Storming, bounded contexts, agregados, linguagem ubiqua.
-- `docs/DOCUMENTO-ENTREGA.md` — checklist de requisitos e dados da entrega.
-- `docs/RELATORIO-VULNERABILIDADES.md` — analise de seguranca e scan.
-- `scripts/security-scan.sh` — executa os scans de vulnerabilidade.
 
 ## Autenticacao (JWT)
 
-As APIs administrativas (CRUDs) exigem token JWT. Publicos: `/health`, `/api/auth/login`
-e (item 6) a consulta de andamento da OS pelo cliente.
+As APIs administrativas (CRUDs e fluxos da OS) exigem token JWT. Endpoints publicos:
+`/health`, `/api/auth/login` e a consulta de andamento da OS pelo cliente
+(`GET /api/acompanhamento/{id}`).
 
 Usuario seed inicial (criado automaticamente):
 
@@ -66,46 +70,38 @@ Usuario seed inicial (criado automaticamente):
 |----------|----------|-------|
 | admin    | admin123 | Admin |
 
-Fluxo:
+Fluxo no Swagger:
 
 1. `POST /api/auth/login` com `{ "username": "admin", "password": "admin123" }` -> retorna `token`.
-2. No Swagger, clique em **Authorize** e informe `Bearer <token>` (ou so o token).
+2. Clique em **Authorize** e informe o token.
 3. Chame os endpoints protegidos.
 
-Senhas sao armazenadas com hash PBKDF2 (SHA256, 100k iteracoes). O `SecretKey` do JWT
-fica em `appsettings.json`/variavel de ambiente e deve ser trocado em producao.
+Seguranca: as senhas sao armazenadas com hash **PBKDF2 (SHA-256, 100k iteracoes, salt aleatorio)**.
+A senha do seed pode ser definida pela variavel `SEED_ADMIN_PASSWORD` e o `Jwt:SecretKey`
+deve vir de variavel de ambiente (`Jwt__SecretKey`) em producao.
 
 ## Fluxo de uso da OS (ponta a ponta)
 
-Todos os endpoints da OS (exceto acompanhamento) exigem JWT.
-
 1. `POST /api/clientes` e `POST /api/veiculos` (cadastros).
-2. `POST /api/ordens-servico` { clienteId, veiculoId } -> OS Recebida.
-3. `POST /api/ordens-servico/{id}/iniciar-diagnostico` -> Em diagnostico.
-4. `POST /api/ordens-servico/{id}/servicos` { servicoId } e `.../pecas` { pecaId, quantidade }.
-5. `POST /api/ordens-servico/{id}/finalizar-diagnostico` -> gera orcamento, Aguardando aprovacao.
-6. `POST /api/ordens-servico/{id}/aprovar` (ou `/cancelar`, ou `DELETE .../servicos/{itemId}` para recusar item) -> Em execucao.
+2. `POST /api/ordens-servico` { clienteId, veiculoId } -> OS **Recebida**.
+3. `POST /api/ordens-servico/{id}/iniciar-diagnostico` -> **Em diagnostico**.
+4. `POST .../{id}/servicos` { servicoId } e `.../{id}/pecas` { pecaId, quantidade }.
+5. `POST .../{id}/finalizar-diagnostico` -> gera orcamento, **Aguardando aprovacao**.
+6. `POST .../{id}/aprovar` (ou `/cancelar`, ou `DELETE .../servicos/{itemId}` para recusar item) -> **Em execucao**.
 7. `POST .../servicos/{itemId}/executar` e `POST .../pecas/{itemId}/usar` (baixa estoque).
-8. `POST /api/ordens-servico/{id}/finalizar-execucao` -> Finalizada.
-9. `POST /api/ordens-servico/{id}/entregar` -> Entregue.
+8. `POST .../{id}/finalizar-execucao` -> **Finalizada**.
+9. `POST .../{id}/entregar` -> **Entregue**.
 
 Consulta publica do cliente: `GET /api/acompanhamento/{id}`.
 Relatorio gerencial: `GET /api/ordens-servico/relatorios/tempo-medio`.
 
 ## Banco de dados e migrations
 
-A persistencia usa EF Core + Npgsql (PostgreSQL). No startup a aplicacao chama
-`DbInitializer.InitializeAsync`, que:
+A persistencia usa EF Core + Npgsql. No startup a aplicacao chama `DbInitializer.InitializeAsync`,
+que aplica as migrations se existirem ou, caso contrario, faz `EnsureCreated()` (cria o schema
+a partir do modelo). Assim o `docker compose up` ja sobe com schema + seeds.
 
-1. aplica as migrations se existirem; ou
-2. faz `EnsureCreated()` (cria o schema a partir do modelo) caso ainda nao haja migrations.
-
-Isso garante que `docker compose up` ja sobe com o schema e os seeds (catalogo de
-servicos e estoque inicial), mesmo antes de gerar migrations.
-
-### Gerar a migration inicial (recomendado para a entrega)
-
-Requer o EF CLI (`dotnet tool install --global dotnet-ef`) e o SDK .NET 8:
+Para gerar a migration inicial (opcional, requer `dotnet-ef`):
 
 ```bash
 dotnet ef migrations add InitialCreate \
@@ -114,86 +110,78 @@ dotnet ef migrations add InitialCreate \
   --output-dir Persistence/Migrations
 ```
 
-A classe `OficinaDbContextFactory` (design-time) fornece a connection string para o CLI.
-Apos gerar, prefira `Database.Migrate()` (ja contemplado pelo `DbInitializer`).
-
-> Ponto de atencao: nao use o mesmo volume de banco alternando entre EnsureCreated e
-> migrations. Para a entrega final, gere a migration antes do primeiro `up` (ou apague o
-> volume `oficina-pgdata`).
-
-## Testes
-
-- Unitarios (dominio): VOs, baixa de estoque e ciclo de vida da OS (xUnit + FluentAssertions).
-- Integracao (API + EF + Postgres real via Testcontainers): autenticacao, CRUD e fluxo
-  ponta-a-ponta da OS. **Requer Docker em execucao** na maquina que roda os testes.
-
-```bash
-dotnet test
-# com cobertura (coverlet)
-dotnet test --collect:"XPlat Code Coverage"
-```
-
-Dica para visualizar cobertura em HTML:
-
-```bash
-dotnet tool install --global dotnet-reportgenerator-globaltool
-reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:Html
-```
-
-Os dominios criticos (Value Objects e agregado OrdemServico) tem testes unitarios diretos
-das regras, somados aos fluxos de integracao, para atingir a meta de 80%.
+> Nao use o mesmo volume de banco alternando entre EnsureCreated e migrations. Para a entrega,
+> gere a migration antes do primeiro `up` (ou apague o volume `oficina-pgdata`).
 
 ## Justificativa do banco de dados (PostgreSQL)
 
-Escolhemos **PostgreSQL** para o MVP pelos seguintes motivos:
+A escolha do banco era livre no desafio; optamos pelo **PostgreSQL**:
 
-1. **Custo zero / open-source** - sem licenciamento, diferente do SQL Server, adequado a um MVP.
-2. **Suporte maduro no EF Core** via provider Npgsql, com migrations e LINQ completos.
-3. **Conteinerizacao trivial** - imagem oficial leve (`postgres:16-alpine`), sobe junto da API no docker-compose com healthcheck.
-4. **Confiabilidade transacional (ACID)** - importante para consistencia entre OS, orcamento e baixa de estoque.
-5. **Recursos uteis** (tipos JSON, indices ricos) caso o dominio evolua.
+1. **Gratuito e open-source (sem custo de licenca).** Diferente do SQL Server, que tem
+   licenciamento pago para uso em producao, o PostgreSQL e totalmente gratuito - ideal para
+   um MVP e para a banca rodar o projeto sem nenhuma barreira de licenca.
+2. **Maduro, confiavel e ACID.** Garante consistencia transacional entre OS, orcamento e baixa
+   de estoque (operacoes que precisam ser atomicas).
+3. **Otima integracao com .NET / EF Core** via provider Npgsql (migrations, LINQ e conversores
+   totalmente suportados).
+4. **Conteinerizacao trivial.** A imagem oficial leve (`postgres:16-alpine`) sobe junto da API
+   no docker-compose com healthcheck, facilitando rodar em qualquer maquina.
+5. **Comunidade grande e recursos avancados** (tipos JSON, indices ricos, full-text) caso o
+   dominio evolua, sem necessidade de trocar de banco.
 
-A camada de acesso e abstraida por repositorios no Domain/Application, entao a troca de banco no futuro tem impacto controlado.
+Alem disso, o acesso a dados e abstraido por repositorios (interfaces na Application,
+implementacao na Infrastructure), entao uma eventual troca de banco no futuro tem impacto
+controlado.
 
-## Estado do projeto
+## Testes
 
-- Item 1 (Fundacao): solution, 5 projetos em camadas, Swagger, health check, Docker. CONCLUIDO.
-- Item 2 (Dominio): VOs (Documento, Placa, Money), enum StatusOS, agregados
-  Cliente/Veiculo/Servico/PecaInsumo/OrdemServico com maquina de estados e invariantes,
-  + testes unitarios das regras criticas. CONCLUIDO.
+- **Unitarios (dominio):** Value Objects (Documento, Placa, Money), baixa/reposicao de estoque,
+  ciclo de vida e transicoes da OS, hash de senha e geracao de JWT.
+- **Integracao (API + Postgres real via Testcontainers):** autenticacao, CRUD completo e o fluxo
+  ponta-a-ponta da OS com baixa de estoque e consulta publica. **Requer Docker em execucao.**
 
-- Item 3 (Persistencia): EF Core + PostgreSQL, DbContext, conversores de VOs, mapeamentos
-  (owned types de itens/orcamento), repositorios, UnitOfWork, seed e design-time factory. CONCLUIDO.
+```bash
+dotnet test
+# com cobertura
+dotnet test --collect:"XPlat Code Coverage"
+```
 
-- Item 4 (CRUDs): camada Application (DTOs, FluentValidation, services) + controllers REST de
-  Cliente, Veiculo, Servico e Peca/Insumo (com reabastecimento de estoque); middleware global
-  de erros (400/404/409/500); validacao de CPF/CNPJ e placa nas bordas. CONCLUIDO.
+Cobertura de testes: **95,1%** (Overall), acima da meta de 80% nos dominios criticos.
 
-- Item 5 (JWT): usuario administrativo, login com emissao de token, PBKDF2 para senha,
-  protecao [Authorize] nos CRUDs e seed do usuario admin. CONCLUIDO.
+## Qualidade e seguranca
 
-- Item 6 (Fluxos da OS): OrdemServicoService cobrindo todas as transicoes (criar, diagnostico,
-  registrar/remover itens, gerar orcamento, aprovar/cancelar, executar, usar peca com baixa de
-  estoque, finalizar, entregar); consulta publica de andamento; relatorio de tempo medio. CONCLUIDO.
+- **SonarQube Community:** Quality Gate **Passed** - 0 bugs, 0 vulnerabilidades abertas,
+  0 security hotspots, 0% de duplicacao e 95,1% de cobertura.
+- **Trivy:** analise de dependencias, imagem e configuracoes. A imagem final usa a base
+  **chiseled** (minima e nao-root), reduzindo as vulnerabilidades de SO de ~144 (base Debian)
+  para ~0.
+- Dependencias .NET sem CVEs aplicaveis (Npgsql 8.0.4, JwtBearer/JWT 8.x).
 
-- Item 7 (Testes de integracao): WebApplicationFactory + Testcontainers (Postgres), cobrindo
-  auth, CRUD e o fluxo completo da OS com baixa de estoque e acompanhamento publico. CONCLUIDO.
+Detalhes e evidencias (antes/depois) em `docs/RELATORIO-VULNERABILIDADES.md`.
 
-Backlog tecnico do MVP concluido. Itens finais (rodar coverage real, gravar video,
-preencher dados do grupo/links) dependem do ambiente local e da entrega.
+## Documentacao do projeto
 
-## Entregaveis da Fase 1 (checklist resumido)
+- **Event Storming (Miro):** https://miro.com/app/board/uXjVHDVaKxg=/?share_link_id=818426939332
+- `DDD-Oficina-Mecanica.md` - Event Storming, bounded contexts, agregados e linguagem ubiqua.
+- `docs/Documentacao-Tecnica-Oficina.docx` - documentacao tecnica consolidada (arquitetura,
+  testes, qualidade e seguranca).
+- `docs/RELATORIO-VULNERABILIDADES.md` - analise de seguranca (SonarQube + Trivy).
+- `docs/DOCUMENTO-ENTREGA.md` - checklist de requisitos e dados da entrega.
+- `docs/` - prints/evidencias dos scans (Sonar e Trivy, antes e depois).
 
-- [x] Estrutura monolitica em camadas
-- [x] Dockerfile + docker-compose.yml
-- [x] Swagger configurado
-- [x] README com execucao local
-- [x] CRUDs administrativos (Cliente, Veiculo, Servico, Peca/Insumo)
-- [x] Fluxos da OS (criar/diagnostico/orcamento/execucao/entrega)
-- [x] Consulta de andamento da OS pelo cliente (publica)
-- [x] Relatorio de tempo medio de execucao
+## Entregaveis da Fase 1 (checklist)
+
+- [x] Back-end monolitico em camadas (DDD)
+- [x] CRUDs de clientes, veiculos, servicos e pecas/insumos (com controle de estoque)
+- [x] Criacao/acompanhamento da OS com 6 status e alteracao automatica
+- [x] Orcamento automatico, aprovacao/recusa/cancelamento
 - [x] Baixa de estoque no uso de peca
-- [x] Autenticacao JWT (login + [Authorize])
-- [x] Testes unitarios e de integracao dos principais fluxos
-- [ ] Confirmar cobertura >= 80% (rodar coverage localmente)
-- [x] Relatorio de vulnerabilidades (docs/RELATORIO-VULNERABILIDADES.md)
+- [x] Consulta de andamento da OS pelo cliente (publica, via API)
+- [x] Relatorio de tempo medio de execucao
+- [x] Autenticacao JWT nas APIs administrativas
+- [x] Validacao de CPF/CNPJ e placa
+- [x] Testes unitarios e de integracao (cobertura 95,1%)
+- [x] Dockerfile + docker-compose.yml
+- [x] Swagger / OpenAPI
+- [x] README com execucao local e justificativa do banco
+- [x] Relatorio de analise de vulnerabilidades
