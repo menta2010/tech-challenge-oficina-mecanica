@@ -32,7 +32,6 @@ automático, autorização, execução, baixa de estoque e entrega do veículo.
   - [Autenticação JWT](#autenticação-jwt)
   - [Banco de Dados](#banco-de-dados)
   - [Testes](#testes)
-  - [Collection Insomnia](#collection-insomnia)
   - [Qualidade e Segurança](#qualidade-e-segurança)
   - [Entregáveis da Fase 1](#entregáveis-da-fase-1)
   - [Documento de Entrega](#documento-de-entrega)
@@ -150,14 +149,10 @@ URL esperada:
 7. Consulte o relatório gerencial:
    - `GET /api/ordens-servico/relatorios/tempo-medio`
 
-Também há uma collection do Insomnia em `docs/insomnia-oficina-mecanica.json`
-para testar o mesmo fluxo em cliente HTTP.
-
 ## Links da Entrega
 
 - Documentação DDD / Event Storming (Miro): https://miro.com/app/board/uXjVHDVaKxg=/?share_link_id=818426939332
 - Repositório: https://github.com/menta2010/tech-challenge-oficina-mecanica
-- Collection Insomnia: `docs/insomnia-oficina-mecanica.json`
 - Documento de entrega: `docs/DOCUMENTO-ENTREGA.pdf`
 - Relatório de vulnerabilidades: `docs/RELATORIO-VULNERABILIDADES.md`
 
