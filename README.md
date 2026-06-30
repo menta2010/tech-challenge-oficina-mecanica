@@ -32,9 +32,10 @@ automático, autorização, execução, baixa de estoque e entrega do veículo.
   - [Autenticação JWT](#autenticação-jwt)
   - [Banco de Dados](#banco-de-dados)
   - [Testes](#testes)
+    - [Opção 1 - Com .NET SDK local](#opção-1---com-net-sdk-local)
+    - [Opção 2 - Sem instalar .NET, usando Docker](#opção-2---sem-instalar-net-usando-docker)
   - [Qualidade e Segurança](#qualidade-e-segurança)
   - [Entregáveis da Fase 1](#entregáveis-da-fase-1)
-  - [Documento de Entrega](#documento-de-entrega)
 
 ## Objetivo da Entrega
 
@@ -370,6 +371,15 @@ contrário, usa `EnsureCreated()` para criar o schema do MVP.
 
 ## Testes
 
+Os testes podem ser executados de duas formas.
+
+### Opção 1 - Com .NET SDK local
+
+Pré-requisitos:
+
+- .NET 8 SDK instalado;
+- Docker Desktop em execução para os testes de integração.
+
 Rodar todos os testes:
 
 ```bash
@@ -382,8 +392,55 @@ Rodar com cobertura:
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
-Observação: testes de integração exigem Docker, pois usam Testcontainers com
-PostgreSQL real.
+### Opção 2 - Sem instalar .NET, usando Docker
+
+Esta opção usa a imagem oficial do SDK .NET 8. Para rodar todos os testes,
+incluindo os testes de integração com Testcontainers, o comando monta o socket
+do Docker para permitir que o Testcontainers suba o PostgreSQL temporário.
+
+```bash
+docker run --rm \
+  -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+  -v "$PWD":/src \
+  -w /src \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  mcr.microsoft.com/dotnet/sdk:8.0 \
+  dotnet test
+```
+
+No macOS com Docker Desktop, `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal`
+é importante porque os testes rodam dentro do container SDK, mas os containers
+do Testcontainers são criados pelo Docker do host. Sem essa variável, os testes
+unitários podem passar, mas os testes de integração podem falhar com
+`ResourceReaperException`.
+
+Se ainda houver erro no `ResourceReaper`/Ryuk em execução local, rode com o Ryuk
+desabilitado para esta chamada:
+
+```bash
+docker run --rm \
+  -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+  -e TESTCONTAINERS_RYUK_DISABLED=true \
+  -v "$PWD":/src \
+  -w /src \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  mcr.microsoft.com/dotnet/sdk:8.0 \
+  dotnet test
+```
+
+Para rodar somente os testes unitários, sem precisar do Testcontainers:
+
+```bash
+docker run --rm \
+  -v "$PWD":/src \
+  -w /src \
+  mcr.microsoft.com/dotnet/sdk:8.0 \
+  dotnet test tests/Oficina.UnitTests
+```
+
+Observação: os testes de integração exigem Docker, pois usam Testcontainers com
+PostgreSQL real. O comando com `docker.sock` deve ser executado na raiz do
+projeto.
 
 Cobertura declarada nas evidências: **95,1%**, acima da meta mínima de 80% nos
 domínios críticos.
@@ -397,15 +454,6 @@ Cobertura funcional:
 - CRUDs administrativos;
 - fluxo completo da OS com baixa de estoque;
 - consulta pública de acompanhamento.
-
-## Collection Insomnia
-
-Collection alternativa para testar os endpoints fora do Swagger:
-
-- arquivo: `docs/insomnia-oficina-mecanica.json`
-- importe pelo Insomnia em `Import > From File`;
-- execute o login e copie o token para a variável `token`;
-- preencha os IDs retornados nas variáveis do ambiente.
 
 ## Qualidade e Segurança
 
@@ -453,15 +501,5 @@ Resumo:
 | Cobertura mínima de 80% | OK | evidências de 95,1% |
 | README explicativo | OK | este arquivo |
 | Relatório de vulnerabilidades | OK | `docs/RELATORIO-VULNERABILIDADES.md` |
-| Documento de entrega PDF | OK, com campos `PREENCHER` a revisar | `docs/DOCUMENTO-ENTREGA.pdf` |
-| Acesso ao usuário `soat-architecture` | PENDENTE DE CONFIRMAÇÃO | confirmar no GitHub |
-
-## Documento de Entrega
-
-O documento solicitado no descritivo está em:
-
-- Fonte editável: `docs/DOCUMENTO-ENTREGA.md`
-- PDF: `docs/DOCUMENTO-ENTREGA.pdf`
-
-Antes da submissão final, revise os campos marcados como `PREENCHER`, em especial
-o username do Discord dos participantes e o nome oficial do grupo caso exista.
+| Documento de entrega PDF | OK |
+| Acesso ao usuário `soat-architecture` | OK|
