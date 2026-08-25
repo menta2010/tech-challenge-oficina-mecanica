@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Oficina.Application.Abstractions;
 using Oficina.Infrastructure.Identity;
+using Oficina.Infrastructure.Notifications;
 using Oficina.Infrastructure.Persistence;
 using Oficina.Infrastructure.Persistence.Repositories;
 
@@ -27,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IOrdemServicoRepository, OrdemServicoRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<INotificadorEmail, EmailNotificadorLog>();
 
         // Identidade
         services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();

@@ -1,6 +1,8 @@
 # Oficina Mecânica - Sistema Integrado de Atendimento e Execução de Serviços
 
-MVP back-end do Tech Challenge Oficina Mecânica - Fase 1.
+MVP back-end do Tech Challenge Oficina Mecânica - **Fase 1**, evoluído na **Fase 2** com
+Clean Architecture, novos casos de uso (webhook de aprovação, notificação por e-mail e listagem
+ordenada) e esteira de infraestrutura (Kubernetes, Terraform e CI/CD).
 
 O projeto implementa um sistema para atendimento de oficina mecânica, cobrindo
 cadastro de clientes e veículos, catálogo de serviços, controle de peças e
@@ -11,7 +13,8 @@ automático, autorização, execução, baixa de estoque e entrega do veículo.
 
 - [Oficina Mecânica - Sistema Integrado de Atendimento e Execução de Serviços](#oficina-mecânica---sistema-integrado-de-atendimento-e-execução-de-serviços)
   - [Índice](#índice)
-  - [Objetivo da Entrega](#objetivo-da-entrega)
+  - [Objetivo da Entrega (Fase 1)](#objetivo-da-entrega-fase-1)
+  - [Objetivo da Fase 2](#objetivo-da-fase-2)
   - [Stack Utilizada](#stack-utilizada)
   - [Como Rodar o Projeto](#como-rodar-o-projeto)
     - [Opção 1 - Docker Compose](#opção-1---docker-compose)
@@ -19,6 +22,8 @@ automático, autorização, execução, baixa de estoque e entrega do veículo.
   - [Como Testar os Endpoints com Swagger](#como-testar-os-endpoints-com-swagger)
   - [Links da Entrega](#links-da-entrega)
   - [Arquitetura](#arquitetura)
+    - [Diagrama de Arquitetura](#diagrama-de-arquitetura)
+    - [Infraestrutura Provisionada](#infraestrutura-provisionada)
     - [Camadas](#camadas)
   - [Principais Domínios](#principais-domínios)
   - [Fluxo da Ordem de Serviço](#fluxo-da-ordem-de-serviço)
@@ -35,9 +40,16 @@ automático, autorização, execução, baixa de estoque e entrega do veículo.
     - [Opção 1 - Com .NET SDK local](#opção-1---com-net-sdk-local)
     - [Opção 2 - Sem instalar .NET, usando Docker](#opção-2---sem-instalar-net-usando-docker)
   - [Qualidade e Segurança](#qualidade-e-segurança)
+  - [Novidades da Fase 2](#novidades-da-fase-2)
+  - [Kubernetes](#kubernetes)
+  - [Infraestrutura (Terraform)](#infraestrutura-terraform)
+  - [CI/CD (GitHub Actions)](#cicd-github-actions)
+    - [Fluxo de Deploy](#fluxo-de-deploy)
+  - [Collection das APIs e Video](#collection-das-apis-e-video)
   - [Entregáveis da Fase 1](#entregáveis-da-fase-1)
+  - [Entregáveis da Fase 2](#entregáveis-da-fase-2)
 
-## Objetivo da Entrega
+## Objetivo da Entrega (Fase 1)
 
 Atender ao descritivo da Fase 1 do Tech Challenge:
 
@@ -51,6 +63,30 @@ Atender ao descritivo da Fase 1 do Tech Challenge:
 - justificativa do banco de dados;
 - relatório de vulnerabilidades;
 - documento de entrega em PDF.
+
+## Objetivo da Fase 2
+
+Evoluir a aplicação da Fase 1 para garantir **qualidade, resiliência e escalabilidade**,
+incorporando práticas modernas de infraestrutura e automação.
+
+**A solução:** a API de gestão de ordens de serviço foi refatorada segundo **Clean Architecture**
+(dependências apontando para o domínio, portas na Application e adaptadores na Infrastructure),
+ganhou novos casos de uso de negócio e passou a ser publicada em **Kubernetes** com
+autoescalonamento, sobre infraestrutura provisionada por **Terraform** e entregue por uma
+**pipeline de CI/CD**.
+
+Objetivos atendidos nesta fase:
+
+- refatoração com Clean Code e Clean Architecture, mantendo os testes automatizados dos fluxos críticos;
+- abertura de OS recebendo cliente, veículo, serviços e peças, retornando o identificador único;
+- consulta do status atual da OS;
+- aprovação/recusa do orçamento por **notificação externa (webhook)**;
+- listagem de OS ordenada por status, mais antigas primeiro, com **exclusão lógica** das finalizadas/entregues;
+- atualização de status comunicada por **e-mail**;
+- conteinerização revisada (Dockerfile + docker-compose);
+- orquestração em **Kubernetes** (Deployments, Services, ConfigMaps/Secrets e HPA por CPU/memória);
+- **infraestrutura como código** com Terraform (cluster Kubernetes + banco de dados);
+- **CI/CD** executando build, testes, imagem Docker e deploy do banco e da aplicação no cluster.
 
 ## Stack Utilizada
 
@@ -205,6 +241,88 @@ docs/
 Fluxo de dependência: `API -> Application -> Domain`. A Infrastructure implementa
 as interfaces da Application e é injetada na API.
 
+### Diagrama de Arquitetura
+
+![Arquitetura da solucao - Fase 2](docs/Arquitetura-Fase2.png)
+
+> Desenho completo da arquitetura escolhida (componentes da aplicacao, infraestrutura
+> provisionada e fluxo de deploy). Arquivo editavel: `docs/Arquitetura-Fase2.svg`.
+> Os diagramas abaixo detalham cada parte.
+
+
+```mermaid
+flowchart TB
+  subgraph EXT[Clientes e sistemas externos]
+    U[Usuario / Front-end]
+    W[Webhook de aprovacao do orcamento]
+  end
+
+  subgraph K8S[Kubernetes - namespace oficina]
+    direction TB
+    subgraph POD_API[Deployment oficina-api - 2..5 replicas + HPA]
+      API[Oficina.API<br/>controllers, JWT, Swagger]
+      APP[Oficina.Application<br/>casos de uso, DTOs, interfaces]
+      DOM[Oficina.Domain<br/>agregados, Value Objects, regras]
+      INFRA[Oficina.Infrastructure<br/>EF Core, repos, JWT, e-mail]
+    end
+    DB[(PostgreSQL<br/>Deployment + PVC)]
+  end
+
+  U -->|HTTPS/JSON + JWT| API
+  W -->|POST /orcamento/resposta + X-Webhook-Token| API
+  API --> APP
+  APP --> DOM
+  INFRA -. implementa interfaces .-> APP
+  API --> INFRA
+  INFRA --> DB
+  INFRA -->|notificacao de mudanca de status| MAIL[[E-mail - log / plugavel]]
+```
+
+Na Fase 2 o desenho segue **Clean Architecture**: as dependências sempre apontam para dentro
+(API -> Application -> Domain) e a Infrastructure implementa as portas definidas na Application,
+de modo que o núcleo de negócio não conhece detalhes de banco, e-mail ou HTTP.
+
+### Infraestrutura Provisionada
+
+```mermaid
+flowchart TB
+  subgraph TF[Terraform - infra/]
+    TFC[kind_cluster<br/>cluster Kubernetes]
+    TFN[kubernetes_namespace<br/>oficina]
+    TFS[kubernetes_secret<br/>credenciais do banco]
+    TFP[kubernetes_deployment + service + PVC<br/>PostgreSQL 16]
+  end
+
+  subgraph CL[Cluster Kubernetes - namespace oficina]
+    direction TB
+    SVCA[Service oficina-api<br/>NodePort 30080]
+    DEPA[Deployment oficina-api<br/>2 a 5 pods]
+    HPA[HorizontalPodAutoscaler<br/>CPU 70% / memoria 80%]
+    CM[ConfigMap<br/>config nao sensivel]
+    SEC[Secret<br/>conn string, JWT, token webhook]
+    SVCD[Service oficina-postgres<br/>ClusterIP 5432]
+    DEPD[Deployment oficina-postgres]
+    PVC[(PersistentVolumeClaim<br/>1Gi)]
+  end
+
+  TFC --> CL
+  TFN --> CL
+  TFS --> SEC
+  TFP --> DEPD
+
+  SVCA --> DEPA
+  HPA -->|escala| DEPA
+  CM --> DEPA
+  SEC --> DEPA
+  DEPA -->|TCP 5432| SVCD
+  SVCD --> DEPD
+  DEPD --> PVC
+```
+
+Recursos criados: cluster Kubernetes (kind, via Terraform), namespace `oficina`, banco PostgreSQL
+(Deployment + Service + PVC + Secret) e, sobre ele, a API (Deployment + Service NodePort +
+ConfigMap + Secret) com autoescalonamento por HPA.
+
 ## Principais Domínios
 
 - **Cliente**: cadastro e identificação por CPF/CNPJ via Value Object `Documento`.
@@ -299,8 +417,8 @@ Fluxo ponta a ponta:
 
 | Método | Rota | Descrição |
 |---|---|---|
-| POST | `/api/ordens-servico` | Cria OS |
-| GET | `/api/ordens-servico` | Lista OS |
+| POST | `/api/ordens-servico` | Abre OS (cliente, veículo e, opcionalmente, serviços e peças) |
+| GET | `/api/ordens-servico` | Lista OS **ativas**, ordenadas por status (exclui finalizadas/entregues/canceladas) |
 | GET | `/api/ordens-servico?status={status}` | Lista por status |
 | GET | `/api/ordens-servico/{id}` | Detalha OS |
 | POST | `/api/ordens-servico/{id}/iniciar-diagnostico` | Muda para diagnóstico |
@@ -311,6 +429,7 @@ Fluxo ponta a ponta:
 | POST | `/api/ordens-servico/{id}/finalizar-diagnostico` | Gera orçamento |
 | POST | `/api/ordens-servico/{id}/aprovar` | Aprova orçamento |
 | POST | `/api/ordens-servico/{id}/cancelar` | Cancela OS |
+| POST | `/api/ordens-servico/{id}/orcamento/resposta` | **Webhook** de aprovação/recusa externa do orçamento (header `X-Webhook-Token`) |
 | POST | `/api/ordens-servico/{id}/servicos/{itemId}/executar` | Marca serviço executado |
 | POST | `/api/ordens-servico/{id}/pecas/{itemId}/usar` | Usa peça e baixa estoque |
 | POST | `/api/ordens-servico/{id}/finalizar-execucao` | Finaliza execução |
@@ -455,6 +574,78 @@ Cobertura funcional:
 - fluxo completo da OS com baixa de estoque;
 - consulta pública de acompanhamento.
 
+## Novidades da Fase 2
+
+Evolução do MVP mantendo o domínio, agora com **Clean Architecture**, novos casos de uso e
+esteira de infraestrutura (Kubernetes, Terraform e CI/CD).
+
+### Novas/ajustadas APIs
+
+- **Abertura de OS** (`POST /api/ordens-servico`): além de cliente e veículo, aceita opcionalmente
+  as listas de `servicos` e `pecas` já identificadas, retornando o identificador único da OS.
+  Quando itens são informados, a OS já entra em diagnóstico com eles registrados.
+
+- **Listagem operacional ordenada** (`GET /api/ordens-servico`): por padrão lista apenas as OS
+  **ativas**, ordenadas por status **Em Execução > Aguardando Aprovação > Em Diagnóstico > Recebida**
+  e, dentro de cada status, as **mais antigas primeiro**. As OS **Finalizada/Entregue/Cancelada**
+  são excluídas **logicamente** da listagem (permanecem no banco; acessíveis por `?status=`).
+- **Aprovação/recusa por notificação externa (webhook)**
+  (`POST /api/ordens-servico/{id}/orcamento/resposta`): endpoint público que recebe a decisão do
+  cliente (`{ "aprovado": true|false, "motivo": "..." }`), protegido por **token de serviço** no
+  header `X-Webhook-Token` (injetado via `Secret` no Kubernetes). Aprovado → **Em execução**;
+  recusado → **Cancelada**.
+- **Notificação de status por e-mail**: a cada mudança de status a aplicação dispara notificação
+  pela porta `INotificadorEmail` (Application). A implementação atual (`EmailNotificadorLog`,
+  Infrastructure) registra o envio em log; trocar por SMTP/serviço de e-mail não altera o domínio.
+
+## Kubernetes
+
+Manifestos em `k8s/`: `Namespace`, `Deployment`/`Service` da API e do PostgreSQL, `ConfigMap`,
+`Secret`s (connection string, chave JWT, token do webhook) e `HorizontalPodAutoscaler` (CPU, 2→5
+réplicas). Passo a passo em `k8s/README.md`.
+
+```bash
+kubectl apply -f k8s/
+kubectl -n oficina rollout status deploy/oficina-api
+kubectl -n oficina port-forward svc/oficina-api 8080:80   # http://localhost:8080/swagger
+```
+
+## Infraestrutura (Terraform)
+
+Código em `infra/`: provisiona um cluster Kubernetes local (**kind**) e o **banco de dados
+PostgreSQL**. Detalhes em `infra/README.md`.
+
+```bash
+cd infra
+terraform init && terraform apply
+```
+
+## CI/CD (GitHub Actions)
+
+Pipeline em `.github/workflows/ci-cd.yml`, em três estágios: **Build & Test** (restore, build e
+testes unitários + integração com Testcontainers, com cobertura), **Docker image** (build e push
+da imagem para o GHCR) e **Deploy to Kubernetes** (cluster kind efêmero, carga da imagem,
+`kubectl apply -f k8s/` e smoke test em `/health`).
+
+### Fluxo de Deploy
+
+```mermaid
+flowchart LR
+  DEV[Commit / push na branch] --> CI[GitHub Actions]
+  CI --> B[Build da aplicacao]
+  B --> T[Testes unitarios + integracao]
+  T --> IMG[Build da imagem Docker]
+  IMG --> REG[(GHCR - registry)]
+  REG --> DEP[kubectl apply -f k8s/]
+  DEP --> DB[(Deploy do banco PostgreSQL)]
+  DEP --> APP[Deploy da API + HPA]
+  APP --> SMOKE[Smoke test /health]
+```
+
+Etapas: o push dispara o pipeline, que compila, roda os testes, publica a imagem no
+registry e aplica os manifestos no cluster (banco e API), finalizando com verificacao
+de saude. A infraestrutura base (cluster + banco) e provisionada com Terraform (`infra/`).
+
 ## Qualidade e Segurança
 
 Evidências em `docs/`:
@@ -474,6 +665,16 @@ Resumo:
   usa runtime chiseled/non-root, reduzindo o total para 6 achados LOW/MEDIUM e
   sem CRITICAL/HIGH.
 - Dependências .NET revisadas, sem CVEs aplicáveis nas versões utilizadas.
+
+## Collection das APIs e Video
+
+- **Collection completa das APIs:** a documentacao interativa (Swagger/OpenAPI) fica disponivel
+  em `http://localhost:8080/swagger` com a aplicacao em execucao. O arquivo OpenAPI pode ser
+  importado no Postman/Insomnia a partir de `http://localhost:8080/swagger/v1/swagger.json`.
+  _Link da collection publicada: **adicionar aqui**._
+- **Video demonstrativo (ate 15 min):** _adicionar link do YouTube/Vimeo aqui._
+  O video deve demonstrar: deploy da aplicacao, execucao do CI/CD, consumo das APIs e
+  escalabilidade automatica (HPA sob carga).
 
 ## Entregáveis da Fase 1
 
@@ -503,3 +704,17 @@ Resumo:
 | Relatório de vulnerabilidades | OK | `docs/RELATORIO-VULNERABILIDADES.md` |
 | Documento de entrega PDF | OK |
 | Acesso ao usuário `soat-architecture` | OK|
+
+## Entregáveis da Fase 2
+
+| Requisito | Status | Evidência |
+|---|---|---|
+| Clean Architecture (portas/adaptadores) | OK | `Oficina.Application/Abstractions` + implementações na Infrastructure |
+| Aprovação do orçamento via webhook externo | OK | `POST /api/ordens-servico/{id}/orcamento/resposta` (token `X-Webhook-Token`) |
+| Listagem ordenada por status + exclusão lógica | OK | `OrdemServicoService.ListarAsync` + `OrdemServicoRepository.ListAtivasAsync` |
+| Notificação de mudança de status por e-mail | OK | `INotificadorEmail` + `EmailNotificadorLog` |
+| Manifestos Kubernetes (Deployments, Services, ConfigMap/Secret, HPA) | OK | `k8s/` |
+| Terraform (cluster + banco) | OK | `infra/` |
+| Pipeline CI/CD (build, testes, imagem, deploy K8s) | OK | `.github/workflows/ci-cd.yml` |
+| Testes dos novos fluxos | OK | `tests/Oficina.IntegrationTests/OrdemServicoFase2Tests.cs` |
+

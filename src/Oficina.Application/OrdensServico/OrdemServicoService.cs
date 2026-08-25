@@ -7,17 +7,30 @@ namespace Oficina.Application.OrdensServico;
 
 /// <summary>
 /// Casos de uso do nucleo do dominio: ciclo de vida da OS.
-/// Orquestra os agregados OrdemServico, Servico, PecaInsumo (baixa de estoque) e Cliente/Veiculo.
+/// Orquestra os agregados OrdemServico, Servico, PecaInsumo (baixa de estoque) e Cliente/Veiculo,
+/// e dispara notificacao de e-mail a cada mudanca de status.
 /// </summary>
 public sealed class OrdemServicoService
 {
     private const string OsNaoEncontrada = "Ordem de servico nao encontrada.";
+
+    // Prioridade de exibicao na listagem: Em Execucao > Aguardando Aprovacao > Diagnostico > Recebida.
+    private static readonly IReadOnlyDictionary<StatusOS, int> PrioridadeListagem =
+        new Dictionary<StatusOS, int>
+        {
+            [StatusOS.EmExecucao] = 0,
+            [StatusOS.AguardandoAprovacao] = 1,
+            [StatusOS.EmDiagnostico] = 2,
+            [StatusOS.Recebida] = 3,
+        };
+
     private readonly IOrdemServicoRepository _repo;
     private readonly IClienteRepository _clientes;
     private readonly IVeiculoRepository _veiculos;
     private readonly IServicoRepository _servicos;
     private readonly IPecaInsumoRepository _pecas;
     private readonly IUnitOfWork _uow;
+    private readonly INotificadorEmail _notificador;
     private readonly IValidator<CriarOrdemServicoRequest> _criarValidator;
     private readonly IValidator<AdicionarServicoRequest> _addServicoValidator;
     private readonly IValidator<AdicionarPecaRequest> _addPecaValidator;
@@ -25,12 +38,13 @@ public sealed class OrdemServicoService
     public OrdemServicoService(
         IOrdemServicoRepository repo, IClienteRepository clientes, IVeiculoRepository veiculos,
         IServicoRepository servicos, IPecaInsumoRepository pecas, IUnitOfWork uow,
+        INotificadorEmail notificador,
         IValidator<CriarOrdemServicoRequest> criarValidator,
         IValidator<AdicionarServicoRequest> addServicoValidator,
         IValidator<AdicionarPecaRequest> addPecaValidator)
     {
         _repo = repo; _clientes = clientes; _veiculos = veiculos; _servicos = servicos;
-        _pecas = pecas; _uow = uow; _criarValidator = criarValidator;
+        _pecas = pecas; _uow = uow; _notificador = notificador; _criarValidator = criarValidator;
         _addServicoValidator = addServicoValidator; _addPecaValidator = addPecaValidator;
     }
 
@@ -47,8 +61,31 @@ public sealed class OrdemServicoService
             throw new ConflictException("O veiculo informado nao pertence a este cliente.");
 
         var os = new OrdemServico(req.ClienteId, req.VeiculoId);
+
+        // Abertura com itens ja identificados: a OS entra em diagnostico e registra servicos/pecas.
+        var temItens = (req.Servicos?.Count ?? 0) > 0 || (req.Pecas?.Count ?? 0) > 0;
+        if (temItens)
+        {
+            os.IniciarDiagnostico();
+
+            foreach (var item in req.Servicos ?? Array.Empty<AdicionarServicoRequest>())
+            {
+                var servico = await _servicos.GetByIdAsync(item.ServicoId, ct)
+                              ?? throw new NotFoundException("Servico nao encontrado no catalogo.");
+                os.RegistrarServico(servico.Id, servico.Nome, servico.ValorBase, servico.TempoEstimado);
+            }
+
+            foreach (var item in req.Pecas ?? Array.Empty<AdicionarPecaRequest>())
+            {
+                var peca = await _pecas.GetByIdAsync(item.PecaId, ct)
+                           ?? throw new NotFoundException("Peca/insumo nao encontrado.");
+                os.RegistrarPeca(peca.Id, item.Quantidade, peca.ValorUnitario);
+            }
+        }
+
         await _repo.AddAsync(os, ct);
         await _uow.SaveChangesAsync(ct);
+        await _notificador.NotificarMudancaStatusAsync(os.Id, os.Status.ToString(), ct);
         return Map(os);
     }
 
@@ -90,14 +127,21 @@ public sealed class OrdemServicoService
     public Task<OrdemServicoResponse> CancelarAsync(Guid id, CancellationToken ct = default)
         => MutarAsync(id, os => os.Cancelar(), ct);
 
+    /// <summary>
+    /// Recebe a resposta externa (webhook) do cliente ao orcamento: aprova (Em execucao) ou recusa (Cancelada).
+    /// </summary>
+    public Task<OrdemServicoResponse> ResponderOrcamentoAsync(Guid id, RespostaOrcamentoRequest req, CancellationToken ct = default)
+        => MutarAsync(id, os =>
+        {
+            if (req.Aprovado) os.AprovarOrcamento();
+            else os.Cancelar();
+        }, ct);
+
     // --- Execucao ---
     public Task<OrdemServicoResponse> ExecutarServicoAsync(Guid id, Guid itemId, CancellationToken ct = default)
         => MutarAsync(id, os => os.ExecutarServico(itemId), ct);
 
-    /// <summary>
-    /// Registra o uso de uma peca e baixa o estoque (cross-agregado).
-    /// Atende ao requisito "baixa de estoque quando peca/insumo for utilizado".
-    /// </summary>
+    /// <summary>Registra o uso de uma peca e baixa o estoque (cross-agregado).</summary>
     public async Task<OrdemServicoResponse> UsarPecaAsync(Guid id, Guid itemId, CancellationToken ct = default)
     {
         var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(OsNaoEncontrada);
@@ -109,11 +153,9 @@ public sealed class OrdemServicoService
         var peca = await _pecas.GetByIdAsync(item.PecaId, ct)
                    ?? throw new NotFoundException("Peca/insumo do item nao encontrada no estoque.");
 
-        peca.Baixar(item.Quantidade);     // pode lancar DomainException (estoque insuficiente) -> 400
-        os.RegistrarUsoPeca(itemId);       // valida status EmExecucao
-
-        // entidades ja rastreadas pelo DbContext: o change tracker persiste sozinho
-        await _uow.SaveChangesAsync(ct);   // ambos confirmados na mesma unidade de trabalho
+        peca.Baixar(item.Quantidade);
+        os.RegistrarUsoPeca(itemId);
+        await _uow.SaveChangesAsync(ct);
         return Map(os);
     }
 
@@ -131,12 +173,23 @@ public sealed class OrdemServicoService
         return Map(os);
     }
 
+    /// <summary>
+    /// Listagem operacional das OSs: por padrao traz apenas as ATIVAS (exclusao logica das
+    /// finalizadas/entregues/canceladas), ordenadas por status
+    /// (Em Execucao > Aguardando Aprovacao > Diagnostico > Recebida) e, dentro do status, as mais antigas primeiro.
+    /// Se um status for informado, filtra por ele (inclui terminais).
+    /// </summary>
     public async Task<IReadOnlyList<OrdemServicoResponse>> ListarAsync(StatusOS? status, CancellationToken ct = default)
     {
-        var lista = status is null
-            ? await _repo.ListAsync(ct)
-            : await _repo.ListByStatusAsync(status.Value, ct);
-        return lista.Select(Map).ToList();
+        if (status is not null)
+            return (await _repo.ListByStatusAsync(status.Value, ct)).Select(Map).ToList();
+
+        var ativas = await _repo.ListAtivasAsync(ct);
+        return ativas
+            .OrderBy(o => PrioridadeListagem.TryGetValue(o.Status, out var p) ? p : int.MaxValue)
+            .ThenBy(o => o.CriadaEm)
+            .Select(Map)
+            .ToList();
     }
 
     /// <summary>Consulta publica de andamento pelo cliente (nao altera estado).</summary>
@@ -162,9 +215,13 @@ public sealed class OrdemServicoService
     private async Task<OrdemServicoResponse> MutarAsync(Guid id, Action<OrdemServico> acao, CancellationToken ct)
     {
         var os = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(OsNaoEncontrada);
+        var statusAntes = os.Status;
         acao(os);
-        // entidade rastreada: nao chamar Update (marcaria itens novos como Modified -> erro)
         await _uow.SaveChangesAsync(ct);
+
+        if (os.Status != statusAntes)
+            await _notificador.NotificarMudancaStatusAsync(os.Id, os.Status.ToString(), ct);
+
         return Map(os);
     }
 

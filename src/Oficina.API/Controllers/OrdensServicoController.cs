@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Oficina.Application.OrdensServico;
 using Oficina.Domain.OrdensServico;
 
@@ -15,7 +16,12 @@ namespace Oficina.API.Controllers;
 public class OrdensServicoController : ControllerBase
 {
     private readonly OrdemServicoService _service;
-    public OrdensServicoController(OrdemServicoService service) => _service = service;
+    private readonly IConfiguration _config;
+    public OrdensServicoController(OrdemServicoService service, IConfiguration config)
+    {
+        _service = service;
+        _config = config;
+    }
 
     /// <summary>Cria a OS para um cliente/veiculo identificados (status inicial: Recebida).</summary>
     [HttpPost]
@@ -68,6 +74,23 @@ public class OrdensServicoController : ControllerBase
     [HttpPost("{id:guid}/cancelar")]
     public async Task<IActionResult> Cancelar(Guid id, CancellationToken ct)
         => Ok(await _service.CancelarAsync(id, ct));
+
+    /// <summary>
+    /// Webhook publico para o cliente aprovar/recusar o orcamento por notificacao externa.
+    /// Protegido por token de servico (header X-Webhook-Token), injetado via Secret (K8s) em producao.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("{id:guid}/orcamento/resposta")]
+    public async Task<IActionResult> ResponderOrcamento(
+        Guid id, RespostaOrcamentoRequest req,
+        [FromHeader(Name = "X-Webhook-Token")] string? token, CancellationToken ct)
+    {
+        var esperado = _config["ExternalApproval:Token"];
+        if (string.IsNullOrWhiteSpace(esperado) || token != esperado)
+            return Unauthorized(new { mensagem = "Token de webhook invalido." });
+
+        return Ok(await _service.ResponderOrcamentoAsync(id, req, ct));
+    }
 
     // Execucao
     [HttpPost("{id:guid}/servicos/{itemId:guid}/executar")]

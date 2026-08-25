@@ -1,0 +1,12 @@
+# Configuracoes NAO sensiveis da API. Segredos ficam no Secret (06-api-secret.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-api-config
+  namespace: oficina
+data:
+  ASPNETCORE_ENVIRONMENT: "Docker"        # habilita Swagger para avaliacao
+  ASPNETCORE_URLS: "http://+:8080"
+  Jwt__Issuer: "oficina-api"
+  Jwt__Audience: "oficina-clients"
+  Jwt__ExpirationMinutes: "60"

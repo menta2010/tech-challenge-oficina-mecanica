@@ -8,6 +8,8 @@ public sealed class CriarOrdemServicoValidator : AbstractValidator<CriarOrdemSer
     {
         RuleFor(x => x.ClienteId).NotEmpty();
         RuleFor(x => x.VeiculoId).NotEmpty();
+        RuleForEach(x => x.Servicos).SetValidator(new AdicionarServicoValidator());
+        RuleForEach(x => x.Pecas).SetValidator(new AdicionarPecaValidator());
     }
 }
 

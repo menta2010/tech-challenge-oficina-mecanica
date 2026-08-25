@@ -1,0 +1,7 @@
+# Copie para terraform.tfvars e ajuste. NAO versione senhas reais.
+cluster_name  = "oficina"
+namespace     = "oficina"
+api_node_port = 30080
+db_name       = "oficina"
+db_user       = "oficina"
+# db_password = "defina-uma-senha-forte"   # prefira: export TF_VAR_db_password=...

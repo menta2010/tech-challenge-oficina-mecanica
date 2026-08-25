@@ -28,6 +28,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__Default: "Host=db;Port=5432;Database=oficina;Username=oficina;Password=oficina"
       Jwt__SecretKey: "CHANGE-ME-super-secret-key-with-at-least-32-chars"
+      ExternalApproval__Token: "dev-webhook-token-CHANGE-ME"
     ports:
       - "8080:8080"
 

@@ -1,0 +1,119 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  # 1) Build + testes (unitarios e de integracao com Testcontainers)
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test (com cobertura)
+        run: dotnet test --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: ./coverage
+
+  # 2) Build da imagem Docker e push para o GitHub Container Registry (GHCR)
+  docker-image:
+    name: Docker image
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # 3) Deploy em Kubernetes (cluster kind efemero no runner) + banco + aplicacao dos manifestos
+  deploy-k8s:
+    name: Deploy to Kubernetes
+    needs: docker-image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: oficina
+
+      - name: Build image and load into kind
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}:latest .
+          kind load docker-image ghcr.io/${{ github.repository }}:latest --name oficina
+
+      - name: Apply manifests (namespace, banco, API, HPA)
+        run: kubectl apply -f k8s/
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n oficina rollout status deploy/oficina-postgres --timeout=180s
+          kubectl -n oficina rollout status deploy/oficina-api --timeout=180s
+
+      - name: Smoke test (/health)
+        run: |
+          kubectl -n oficina port-forward svc/oficina-api 8080:80 &
+          sleep 8
+          curl -fsS http://localhost:8080/health
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n oficina get pods,svc,hpa || true
+          kubectl -n oficina describe pods || true
+          kubectl -n oficina logs deploy/oficina-api --tail=100 || true

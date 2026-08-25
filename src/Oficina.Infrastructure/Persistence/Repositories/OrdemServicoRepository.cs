@@ -20,6 +20,14 @@ public sealed class OrdemServicoRepository : EfRepository<OrdemServico>, IOrdemS
     public Task<List<OrdemServico>> ListByStatusAsync(StatusOS status, CancellationToken ct = default)
         => ComItens().Where(o => o.Status == status).ToListAsync(ct);
 
+    // Exclusao logica: nao traz OSs terminais (Finalizada/Entregue/Cancelada) na listagem operacional.
+    public Task<List<OrdemServico>> ListAtivasAsync(CancellationToken ct = default)
+        => ComItens()
+              .Where(o => o.Status != StatusOS.Finalizada
+                       && o.Status != StatusOS.Entregue
+                       && o.Status != StatusOS.Cancelada)
+              .ToListAsync(ct);
+
     public Task<List<OrdemServico>> ListFinalizadasOuEntreguesAsync(CancellationToken ct = default)
         => Db.OrdensServico
               .Where(o => o.Status == StatusOS.Finalizada || o.Status == StatusOS.Entregue)
