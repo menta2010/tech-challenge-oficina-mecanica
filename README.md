@@ -117,7 +117,8 @@ URLs:
 
 - API: http://localhost:8080
 - Swagger: http://localhost:8080/swagger
-- Health: http://localhost:8080/health
+- Liveness: http://localhost:8080/health/live
+- Readiness (inclui PostgreSQL): http://localhost:8080/health/ready
 
 No primeiro start, o schema e os dados seed são criados automaticamente:
 
@@ -366,7 +367,9 @@ Fluxo ponta a ponta:
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/health` | Health check da aplicação |
+| GET | `/health/live` | Liveness da aplicação |
+| GET | `/health/ready` | Readiness da aplicação, incluindo conexão com PostgreSQL |
+| GET | `/health` | Alias compatível de readiness |
 | GET | `/api/health` | Health check via controller |
 | POST | `/api/auth/login` | Login administrativo |
 | GET | `/api/acompanhamento/{id}` | Consulta pública do andamento da OS |
@@ -440,7 +443,7 @@ Fluxo ponta a ponta:
 
 As APIs administrativas exigem token JWT. Endpoints públicos:
 
-- `GET /health`
+- `GET /health`, `GET /health/live` e `GET /health/ready`
 - `GET /api/health`
 - `POST /api/auth/login`
 - `GET /api/acompanhamento/{id}`
@@ -625,7 +628,7 @@ terraform init && terraform apply
 Pipeline em `.github/workflows/ci-cd.yml`, em três estágios: **Build & Test** (restore, build e
 testes unitários + integração com Testcontainers, com cobertura), **Docker image** (build e push
 da imagem para o GHCR) e **Deploy to Kubernetes** (cluster kind efêmero, carga da imagem,
-`kubectl apply -f k8s/` e smoke test em `/health`).
+`kubectl apply -f k8s/` e smoke test em `/health/ready`).
 
 ### Fluxo de Deploy
 
@@ -639,7 +642,7 @@ flowchart LR
   REG --> DEP[kubectl apply -f k8s/]
   DEP --> DB[(Deploy do banco PostgreSQL)]
   DEP --> APP[Deploy da API + HPA]
-  APP --> SMOKE[Smoke test /health]
+  APP --> SMOKE[Smoke test /health/ready + PostgreSQL]
 ```
 
 Etapas: o push dispara o pipeline, que compila, roda os testes, publica a imagem no
