@@ -11,10 +11,22 @@ public class HealthEndpointTests
     public HealthEndpointTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
-    public async Task Get_Health_DeveRetornar200()
+    public async Task Get_HealthLive_DeveRetornarHealthy()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/health/live");
+
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Be("Healthy");
+    }
+
+    [Fact]
+    public async Task Get_HealthReady_DeveValidarPostgresERetornarHealthy()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/ready");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Be("Healthy");
     }
 }

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
+using Oficina.API.HealthChecks;
 using Oficina.API.Middlewares;
 using Oficina.Application;
 using Oficina.Infrastructure;
@@ -43,8 +45,9 @@ builder.Services.AddSwaggerGen(options =>
 
 // AuthN/AuthZ (JWT) sao configurados em AddInfrastructure
 
-// Health checks
-builder.Services.AddHealthChecks();
+// Health checks: liveness valida o processo; readiness tambem valida o PostgreSQL.
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgresHealthCheck>("postgresql", tags: new[] { "ready" });
 
 var app = builder.Build();
 
@@ -68,7 +71,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
+// Mantem compatibilidade com clientes que ainda utilizam o endpoint original.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 await app.RunAsync();
 

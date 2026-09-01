@@ -50,7 +50,9 @@ kubectl -n oficina rollout status deploy/oficina-api
 minikube service oficina-api -n oficina --url
 # kind / genérico (port-forward)
 kubectl -n oficina port-forward svc/oficina-api 8080:80
-# depois: http://localhost:8080/swagger  e  http://localhost:8080/health
+# depois: http://localhost:8080/swagger
+# liveness: http://localhost:8080/health/live
+# readiness (inclui PostgreSQL): http://localhost:8080/health/ready
 ```
 
 ## Verificação

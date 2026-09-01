@@ -6,8 +6,8 @@ namespace Oficina.API.Controllers;
 public sealed record HealthResponse(string Status, string Service, DateTime Timestamp);
 
 /// <summary>
-/// Endpoint simples de verificacao de disponibilidade da API.
-/// Usado pelo docker-compose/healthcheck e como smoke test.
+/// Endpoint JSON simples mantido para consulta da disponibilidade da API.
+/// As probes e o smoke test utilizam /health/live e /health/ready.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]

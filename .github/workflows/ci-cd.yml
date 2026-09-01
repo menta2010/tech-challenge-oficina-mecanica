@@ -105,11 +105,16 @@ jobs:
           kubectl -n oficina rollout status deploy/oficina-postgres --timeout=180s
           kubectl -n oficina rollout status deploy/oficina-api --timeout=180s
 
-      - name: Smoke test (/health)
+      - name: Smoke test (/health/ready)
         run: |
           kubectl -n oficina port-forward svc/oficina-api 8080:80 &
           sleep 8
-          curl -fsS http://localhost:8080/health
+          http_status=$(curl --silent --show-error --connect-timeout 5 --max-time 15 \
+            --output /tmp/health-body --write-out "%{http_code}" \
+            http://localhost:8080/health/ready)
+          health_body=$(tr -d '\r\n' < /tmp/health-body)
+          test "$http_status" = "200"
+          test "$health_body" = "Healthy"
 
       - name: Diagnostics on failure
         if: failure()
