@@ -191,8 +191,10 @@ URL esperada:
 
 - Documentação DDD / Event Storming (Miro): https://miro.com/app/board/uXjVHDVaKxg=/?share_link_id=818426939332
 - Repositório: https://github.com/menta2010/tech-challenge-oficina-mecanica
-- Documento de entrega: `docs/DOCUMENTO-ENTREGA.pdf`
-- Relatório de vulnerabilidades: `docs/RELATORIO-VULNERABILIDADES.md`
+- Arquitetura da Fase 2: [`docs/Arquitetura-Fase2.png`](docs/Arquitetura-Fase2.png)
+- Relatório das alterações da Fase 2: [`docs/Relatorio-de-Alteracoes-Fase2.docx`](docs/Relatorio-de-Alteracoes-Fase2.docx)
+- Swagger/OpenAPI local: http://localhost:8080/swagger
+- Vídeo demonstrativo e PDF final: **pendentes de publicação após a gravação**.
 
 ## Arquitetura
 
@@ -613,6 +615,23 @@ kubectl -n oficina rollout status deploy/oficina-api
 kubectl -n oficina port-forward svc/oficina-api 8080:80   # http://localhost:8080/swagger
 ```
 
+### Demonstração do HPA
+
+O script `scripts/demo-hpa.sh` instala/valida o Metrics Server e cria uma carga controlada
+no cluster local/de avaliação. Ele usa tentativas de login inválidas para exercitar o hash de
+senha e elevar o consumo de CPU, sem armazenar ou exibir credenciais reais.
+
+```bash
+scripts/demo-hpa.sh prepare
+scripts/demo-hpa.sh status
+scripts/demo-hpa.sh start
+scripts/demo-hpa.sh watch   # aguarde o número de réplicas aumentar; encerre com Ctrl+C
+scripts/demo-hpa.sh stop
+```
+
+Execute esse roteiro somente em um cluster local/de avaliação. O HPA inicia com 2 réplicas e
+pode escalar a API até 5 réplicas.
+
 ## Infraestrutura (Terraform)
 
 Código em `infra/`: provisiona um cluster Kubernetes local (**kind**) e o **banco de dados
@@ -625,29 +644,35 @@ terraform init && terraform apply
 
 ## CI/CD (GitHub Actions)
 
-Pipeline em `.github/workflows/ci-cd.yml`, em três estágios: **Build & Test** (restore, build e
-testes unitários + integração com Testcontainers, com cobertura), **Docker image** (build e push
-da imagem para o GHCR) e **Deploy to Kubernetes** (cluster kind efêmero, carga da imagem,
-`kubectl apply -f k8s/` e smoke test em `/health/ready`).
+Pipeline em `.github/workflows/ci-cd.yml`, acionada por push/PR na branch `master` ou manualmente.
+Ela possui quatro estágios: **Build & Test** (restore, build e testes unitários + integração com
+Testcontainers, com cobertura), **Terraform validate** (formatação, inicialização e validação da
+IaC), **Docker image** (build e push da imagem para o GHCR) e **Deploy to Kubernetes** (cluster
+kind efêmero, Metrics Server, aplicação dos manifestos, validação do HPA e smoke test em
+`/health/ready`). Em pull requests são executadas somente as validações; publicação e deploy
+ocorrem em push ou execução manual na `master`.
 
 ### Fluxo de Deploy
 
 ```mermaid
 flowchart LR
-  DEV[Commit / push na branch] --> CI[GitHub Actions]
+  DEV[Commit / push na master] --> CI[GitHub Actions]
   CI --> B[Build da aplicacao]
+  CI --> TFV[Validacao Terraform]
   B --> T[Testes unitarios + integracao]
   T --> IMG[Build da imagem Docker]
+  TFV --> IMG
   IMG --> REG[(GHCR - registry)]
   REG --> DEP[kubectl apply -f k8s/]
   DEP --> DB[(Deploy do banco PostgreSQL)]
-  DEP --> APP[Deploy da API + HPA]
+  DEP --> APP[Deploy da API + Metrics Server + HPA]
   APP --> SMOKE[Smoke test /health/ready + PostgreSQL]
 ```
 
-Etapas: o push dispara o pipeline, que compila, roda os testes, publica a imagem no
-registry e aplica os manifestos no cluster (banco e API), finalizando com verificacao
-de saude. A infraestrutura base (cluster + banco) e provisionada com Terraform (`infra/`).
+Etapas: o push na `master` dispara a pipeline, que compila, roda os testes, valida o Terraform,
+publica a imagem no registry e aplica os manifestos no cluster (banco e API), finalizando com
+validação das métricas/HPA e verificação de saúde. A infraestrutura base (cluster + banco) pode
+ser provisionada separadamente com Terraform (`infra/`).
 
 ## Qualidade e Segurança
 
@@ -659,7 +684,6 @@ Evidências em `docs/`:
 - `sonar-issues_de_corrigir.json`
 - `Scan_Vulnerabilidade_Trivy_Antes_De_Corrigir.html`
 - `trivy-depois.html`
-- `RELATORIO-VULNERABILIDADES.md`
 
 Resumo:
 
@@ -669,15 +693,17 @@ Resumo:
   sem CRITICAL/HIGH.
 - Dependências .NET revisadas, sem CVEs aplicáveis nas versões utilizadas.
 
-## Collection das APIs e Video
+## Collection das APIs e Vídeo
 
-- **Collection completa das APIs:** a documentacao interativa (Swagger/OpenAPI) fica disponivel
-  em `http://localhost:8080/swagger` com a aplicacao em execucao. O arquivo OpenAPI pode ser
-  importado no Postman/Insomnia a partir de `http://localhost:8080/swagger/v1/swagger.json`.
-  _Link da collection publicada: **adicionar aqui**._
-- **Video demonstrativo (ate 15 min):** _adicionar link do YouTube/Vimeo aqui._
-  O video deve demonstrar: deploy da aplicacao, execucao do CI/CD, consumo das APIs e
-  escalabilidade automatica (HPA sob carga).
+- **Collection completa das APIs:** a documentação interativa está disponível em
+  [Swagger](http://localhost:8080/swagger) com a aplicação em execução. O contrato OpenAPI pode
+  ser obtido em http://localhost:8080/swagger/v1/swagger.json e importado no Postman/Insomnia.
+- **Vídeo demonstrativo (até 15 min):** **pendente de publicação no YouTube/Vimeo**. Após a
+  gravação, substitua esta observação pelo link público ou não listado.
+- **Conteúdo obrigatório do vídeo:** deploy da aplicação, execução do CI/CD, consumo das APIs e
+  escalabilidade automática. Para o último item, use `scripts/demo-hpa.sh`.
+- **PDF para o portal:** deve ser gerado depois da publicação do vídeo e conter o link do
+  repositório, o desenho da arquitetura e o link do vídeo.
 
 ## Entregáveis da Fase 1
 
@@ -704,9 +730,9 @@ Resumo:
 | Testes automatizados | OK | `tests/` |
 | Cobertura mínima de 80% | OK | evidências de 95,1% |
 | README explicativo | OK | este arquivo |
-| Relatório de vulnerabilidades | OK | `docs/RELATORIO-VULNERABILIDADES.md` |
-| Documento de entrega PDF | OK |
-| Acesso ao usuário `soat-architecture` | OK|
+| Relatório de vulnerabilidades | OK | Evidências SonarQube/Trivy em `docs/` |
+| Documento de entrega PDF | Verificar | Não está presente neste checkout |
+| Acesso ao usuário `soat-architecture` | Verificar | Confirmar em Settings → Collaborators |
 
 ## Entregáveis da Fase 2
 
@@ -715,9 +741,11 @@ Resumo:
 | Clean Architecture (portas/adaptadores) | OK | `Oficina.Application/Abstractions` + implementações na Infrastructure |
 | Aprovação do orçamento via webhook externo | OK | `POST /api/ordens-servico/{id}/orcamento/resposta` (token `X-Webhook-Token`) |
 | Listagem ordenada por status + exclusão lógica | OK | `OrdemServicoService.ListarAsync` + `OrdemServicoRepository.ListAtivasAsync` |
-| Notificação de mudança de status por e-mail | OK | `INotificadorEmail` + `EmailNotificadorLog` |
+| Notificação de mudança de status | Parcial | Porta `INotificadorEmail`; adaptador atual registra a notificação em log |
 | Manifestos Kubernetes (Deployments, Services, ConfigMap/Secret, HPA) | OK | `k8s/` |
 | Terraform (cluster + banco) | OK | `infra/` |
-| Pipeline CI/CD (build, testes, imagem, deploy K8s) | OK | `.github/workflows/ci-cd.yml` |
+| Pipeline CI/CD (build, testes, IaC, imagem, deploy K8s) | Implementada | `.github/workflows/ci-cd.yml`; confirmar execução verde após push |
 | Testes dos novos fluxos | OK | `tests/Oficina.IntegrationTests/OrdemServicoFase2Tests.cs` |
-
+| Demonstração reproduzível do HPA | OK | `scripts/demo-hpa.sh` |
+| Collection Swagger/OpenAPI | OK local | `/swagger` e `/swagger/v1/swagger.json` |
+| Vídeo e PDF final | Pendente | Ação final após gravação/publicação |

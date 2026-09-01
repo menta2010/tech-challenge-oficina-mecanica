@@ -2,9 +2,14 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -40,11 +45,36 @@ jobs:
           name: coverage
           path: ./coverage
 
-  # 2) Build da imagem Docker e push para o GitHub Container Registry (GHCR)
+  # 2) Validacao estatica da infraestrutura como codigo
+  infra-validate:
+    name: Terraform validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.13.0'
+
+      - name: Terraform format
+        working-directory: infra
+        run: terraform fmt -check
+
+      - name: Terraform init
+        working-directory: infra
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        working-directory: infra
+        run: terraform validate
+
+  # 3) Build da imagem Docker e push para o GitHub Container Registry (GHCR)
   docker-image:
     name: Docker image
-    needs: build-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-test, infra-validate]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -77,11 +107,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # 3) Deploy em Kubernetes (cluster kind efemero no runner) + banco + aplicacao dos manifestos
+  # 4) Deploy em Kubernetes (cluster kind efemero no runner) + banco + aplicacao dos manifestos
   deploy-k8s:
     name: Deploy to Kubernetes
     needs: docker-image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -91,6 +121,16 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: oficina
+
+      - name: Install metrics-server for HPA
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
+          if ! kubectl -n kube-system get deploy metrics-server \
+            -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -q -- '--kubelet-insecure-tls'; then
+            kubectl -n kube-system patch deployment metrics-server --type=json \
+              -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          fi
+          kubectl -n kube-system rollout status deploy/metrics-server --timeout=180s
 
       - name: Build image and load into kind
         run: |
@@ -104,6 +144,19 @@ jobs:
         run: |
           kubectl -n oficina rollout status deploy/oficina-postgres --timeout=180s
           kubectl -n oficina rollout status deploy/oficina-api --timeout=180s
+
+      - name: Verify metrics and HPA
+        run: |
+          for attempt in {1..12}; do
+            if kubectl top pods -n oficina; then
+              kubectl -n oficina get hpa oficina-api-hpa
+              exit 0
+            fi
+            echo "Aguardando metricas (${attempt}/12)..."
+            sleep 5
+          done
+          echo "Metrics Server nao disponibilizou metricas dentro do prazo."
+          exit 1
 
       - name: Smoke test (/health/ready)
         run: |

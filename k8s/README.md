@@ -23,10 +23,10 @@ Manifestos para subir a API .NET e o PostgreSQL em um cluster Kubernetes
 - Cluster ativo. Para local:
   - **kind:** `kind create cluster --name oficina` (ou use o Terraform em `/infra`).
   - **minikube:** `minikube start`.
-- **metrics-server** (necessário para o HPA):
+- **metrics-server** (necessário para o HPA). O script da raiz automatiza a instalação e a
+  adaptação para clusters locais:
   ```bash
-  kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-  # kind/minikube: pode ser necessário --kubelet-insecure-tls no metrics-server
+  scripts/demo-hpa.sh prepare
   ```
 - Imagem da API acessível pelo cluster. Em produção o CI publica em
   `ghcr.io/menta2010/tech-challenge-oficina-mecanica:latest`. Para testar local com kind:
@@ -61,6 +61,38 @@ kubectl -n oficina port-forward svc/oficina-api 8080:80
 kubectl -n oficina get pods,svc,hpa
 kubectl -n oficina logs deploy/oficina-api
 ```
+
+## Demonstrar escalabilidade automática
+
+O roteiro abaixo prepara métricas, mostra o estado inicial, inicia carga controlada e acompanha
+o aumento de réplicas. Rode os comandos a partir da raiz do repositório e somente em um cluster
+local/de avaliação.
+
+```bash
+scripts/demo-hpa.sh prepare
+scripts/demo-hpa.sh status
+scripts/demo-hpa.sh start
+scripts/demo-hpa.sh watch
+```
+
+Durante `watch`, aguarde o HPA aumentar o Deployment de 2 para até 5 pods. Encerre a observação
+com `Ctrl+C` e remova o gerador de carga:
+
+```bash
+scripts/demo-hpa.sh stop
+scripts/demo-hpa.sh status
+```
+
+Por padrão são usados 20 workers. Se a máquina tiver poucos recursos, reduza a carga; se o
+limite de CPU não for atingido, aumente-a:
+
+```bash
+LOAD_WORKERS=10 scripts/demo-hpa.sh start
+LOAD_WORKERS=40 scripts/demo-hpa.sh start
+```
+
+O gerador envia tentativas inválidas de login para exercitar o hash de senha. Nenhuma senha
+válida ou token é armazenado pelo script.
 
 ## Observações de segurança
 
