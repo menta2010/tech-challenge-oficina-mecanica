@@ -1,20 +1,22 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Oficina.Domain.Identidade;
 using Oficina.Application.Estoque;
 
 namespace Oficina.API.Controllers;
 
 /// <summary>CRUD de pecas/insumos com controle de estoque. Requisito: gestao de pecas e estoque.</summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = Perfis.Funcionarios)]
 [Route("api/pecas-insumos")]
 public class PecasInsumosController : ControllerBase
 {
     private readonly PecaInsumoService _service;
     public PecasInsumosController(PecaInsumoService service) => _service = service;
 
+    [Authorize(Roles = Perfis.Admin)]
     [HttpPost]
-    public async Task<IActionResult> Criar(CreatePecaInsumoRequest req, CancellationToken ct)
+    public async Task<IActionResult> Criar(CriarPecaInsumoRequest req, CancellationToken ct)
     {
         var r = await _service.CriarAsync(req, ct);
         return CreatedAtAction(nameof(Obter), new { id = r.Id }, r);
@@ -26,15 +28,11 @@ public class PecasInsumosController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Obter(Guid id, CancellationToken ct) => Ok(await _service.ObterAsync(id, ct));
 
+    [Authorize(Roles = Perfis.Admin)]
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Atualizar(Guid id, UpdatePecaInsumoRequest req, CancellationToken ct)
+    public async Task<IActionResult> Atualizar(Guid id, AtualizarPecaInsumoRequest req, CancellationToken ct)
         => Ok(await _service.AtualizarAsync(id, req, ct));
-
-    /// <summary>Reabastece o estoque (entrada de pecas/insumos).</summary>
-    [HttpPost("{id:guid}/reabastecer")]
-    public async Task<IActionResult> Reabastecer(Guid id, ReabastecerEstoqueRequest req, CancellationToken ct)
-        => Ok(await _service.ReabastecerAsync(id, req, ct));
-
+    [Authorize(Roles = Perfis.Admin)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Remover(Guid id, CancellationToken ct)
     {
