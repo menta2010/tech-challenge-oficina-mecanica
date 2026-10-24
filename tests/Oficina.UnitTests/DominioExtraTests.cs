@@ -54,21 +54,12 @@ public class DominioExtraTests
     }
 
     [Fact]
-    public void Peca_Atualizar_e_Repor()
+    public void Peca_Atualizar()
     {
-        var p = new PecaInsumo("Filtro", Money.From(30m), 10);
+        var p = new PecaInsumo("Filtro", Money.From(30m));
         p.Atualizar("Filtro novo", Money.From(35m));
         p.Nome.Should().Be("Filtro novo");
-        p.Repor(5);
-        p.QuantidadeEmEstoque.Should().Be(15);
-    }
-
-    [Fact]
-    public void Peca_Repor_QuantidadeInvalida_DeveLancar()
-    {
-        var p = new PecaInsumo("Filtro", Money.From(30m), 10);
-        var acao = () => p.Repor(0);
-        acao.Should().Throw<DomainException>();
+        p.ValorUnitario.Valor.Should().Be(35m);
     }
 
     [Fact]
