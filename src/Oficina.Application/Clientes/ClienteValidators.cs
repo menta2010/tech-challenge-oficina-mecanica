@@ -4,9 +4,9 @@ namespace Oficina.Application.Clientes;
 
 // Validacao de borda: campos obrigatorios/tamanho. A correcao do CPF/CNPJ
 // e garantida pelo Value Object Documento no dominio.
-public sealed class CreateClienteValidator : AbstractValidator<CreateClienteRequest>
+public sealed class CriarClienteValidator : AbstractValidator<CriarClienteRequest>
 {
-    public CreateClienteValidator()
+    public CriarClienteValidator()
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Documento).NotEmpty();
@@ -15,9 +15,9 @@ public sealed class CreateClienteValidator : AbstractValidator<CreateClienteRequ
     }
 }
 
-public sealed class UpdateClienteValidator : AbstractValidator<UpdateClienteRequest>
+public sealed class AtualizarClienteValidator : AbstractValidator<AtualizarClienteRequest>
 {
-    public UpdateClienteValidator()
+    public AtualizarClienteValidator()
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(200);
     }

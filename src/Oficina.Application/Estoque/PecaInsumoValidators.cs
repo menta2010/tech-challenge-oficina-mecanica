@@ -2,19 +2,18 @@ using FluentValidation;
 
 namespace Oficina.Application.Estoque;
 
-public sealed class CreatePecaInsumoValidator : AbstractValidator<CreatePecaInsumoRequest>
+public sealed class CriarPecaInsumoValidator : AbstractValidator<CriarPecaInsumoRequest>
 {
-    public CreatePecaInsumoValidator()
+    public CriarPecaInsumoValidator()
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(160);
         RuleFor(x => x.ValorUnitario).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.QuantidadeEmEstoque).GreaterThanOrEqualTo(0);
     }
 }
 
-public sealed class UpdatePecaInsumoValidator : AbstractValidator<UpdatePecaInsumoRequest>
+public sealed class AtualizarPecaInsumoValidator : AbstractValidator<AtualizarPecaInsumoRequest>
 {
-    public UpdatePecaInsumoValidator()
+    public AtualizarPecaInsumoValidator()
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(160);
         RuleFor(x => x.ValorUnitario).GreaterThanOrEqualTo(0);

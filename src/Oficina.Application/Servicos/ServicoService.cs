@@ -11,11 +11,11 @@ public sealed class ServicoService
 {
     private readonly IServicoRepository _repo;
     private readonly IUnitOfWork _uow;
-    private readonly IValidator<CreateServicoRequest> _createValidator;
-    private readonly IValidator<UpdateServicoRequest> _updateValidator;
+    private readonly IValidator<CriarServicoRequest> _createValidator;
+    private readonly IValidator<AtualizarServicoRequest> _updateValidator;
 
     public ServicoService(IServicoRepository repo, IUnitOfWork uow,
-        IValidator<CreateServicoRequest> createValidator, IValidator<UpdateServicoRequest> updateValidator)
+        IValidator<CriarServicoRequest> createValidator, IValidator<AtualizarServicoRequest> updateValidator)
     {
         _repo = repo;
         _uow = uow;
@@ -23,7 +23,7 @@ public sealed class ServicoService
         _updateValidator = updateValidator;
     }
 
-    public async Task<ServicoResponse> CriarAsync(CreateServicoRequest req, CancellationToken ct = default)
+    public async Task<ServicoResponse> CriarAsync(CriarServicoRequest req, CancellationToken ct = default)
     {
         await _createValidator.ValidateAndThrowAsync(req, ct);
         var servico = new Servico(req.Nome, Money.From(req.ValorBase),
@@ -33,10 +33,10 @@ public sealed class ServicoService
         return Map(servico);
     }
 
-    public async Task<ServicoResponse> AtualizarAsync(Guid id, UpdateServicoRequest req, CancellationToken ct = default)
+    public async Task<ServicoResponse> AtualizarAsync(Guid id, AtualizarServicoRequest req, CancellationToken ct = default)
     {
         await _updateValidator.ValidateAndThrowAsync(req, ct);
-        var servico = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Servico nao encontrado.");
+        var servico = await _repo.ObterOuFalharAsync(id, "Servico nao encontrado.", ct);
         servico.Atualizar(req.Nome, Money.From(req.ValorBase), TimeSpan.FromMinutes(req.TempoEstimadoMinutos), req.Descricao);
         _repo.Update(servico);
         await _uow.SaveChangesAsync(ct);
@@ -45,7 +45,7 @@ public sealed class ServicoService
 
     public async Task<ServicoResponse> ObterAsync(Guid id, CancellationToken ct = default)
     {
-        var servico = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Servico nao encontrado.");
+        var servico = await _repo.ObterOuFalharAsync(id, "Servico nao encontrado.", ct);
         return Map(servico);
     }
 
@@ -54,7 +54,7 @@ public sealed class ServicoService
 
     public async Task RemoverAsync(Guid id, CancellationToken ct = default)
     {
-        var servico = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Servico nao encontrado.");
+        var servico = await _repo.ObterOuFalharAsync(id, "Servico nao encontrado.", ct);
         _repo.Remove(servico);
         await _uow.SaveChangesAsync(ct);
     }

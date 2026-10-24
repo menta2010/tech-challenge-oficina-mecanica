@@ -6,73 +6,55 @@ using Oficina.Domain.Shared;
 
 namespace Oficina.Application.Estoque;
 
-/// <summary>Casos de uso de Peca/Insumo. Atende ao CRUD com controle de estoque (incluindo reabastecimento).</summary>
+/// <summary>Casos de uso do catalogo de pecas/insumos (global). O saldo por loja fica no EstoqueService.</summary>
 public sealed class PecaInsumoService
 {
     private const string NaoEncontrado = "Peca/insumo nao encontrado.";
     private readonly IPecaInsumoRepository _repo;
     private readonly IUnitOfWork _uow;
-    private readonly IValidator<CreatePecaInsumoRequest> _createValidator;
-    private readonly IValidator<UpdatePecaInsumoRequest> _updateValidator;
-    private readonly IValidator<ReabastecerEstoqueRequest> _reabastecerValidator;
+    private readonly IValidator<CriarPecaInsumoRequest> _criarValidator;
+    private readonly IValidator<AtualizarPecaInsumoRequest> _atualizarValidator;
 
     public PecaInsumoService(IPecaInsumoRepository repo, IUnitOfWork uow,
-        IValidator<CreatePecaInsumoRequest> createValidator,
-        IValidator<UpdatePecaInsumoRequest> updateValidator,
-        IValidator<ReabastecerEstoqueRequest> reabastecerValidator)
+        IValidator<CriarPecaInsumoRequest> criarValidator,
+        IValidator<AtualizarPecaInsumoRequest> atualizarValidator)
     {
         _repo = repo;
         _uow = uow;
-        _createValidator = createValidator;
-        _updateValidator = updateValidator;
-        _reabastecerValidator = reabastecerValidator;
+        _criarValidator = criarValidator;
+        _atualizarValidator = atualizarValidator;
     }
 
-    public async Task<PecaInsumoResponse> CriarAsync(CreatePecaInsumoRequest req, CancellationToken ct = default)
+    public async Task<PecaInsumoResponse> CriarAsync(CriarPecaInsumoRequest req, CancellationToken ct = default)
     {
-        await _createValidator.ValidateAndThrowAsync(req, ct);
-        var peca = new PecaInsumo(req.Nome, Money.From(req.ValorUnitario), req.QuantidadeEmEstoque);
+        await _criarValidator.ValidateAndThrowAsync(req, ct);
+        var peca = new PecaInsumo(req.Nome, Money.From(req.ValorUnitario));
         await _repo.AddAsync(peca, ct);
         await _uow.SaveChangesAsync(ct);
         return Map(peca);
     }
 
-    public async Task<PecaInsumoResponse> AtualizarAsync(Guid id, UpdatePecaInsumoRequest req, CancellationToken ct = default)
+    public async Task<PecaInsumoResponse> AtualizarAsync(Guid id, AtualizarPecaInsumoRequest req, CancellationToken ct = default)
     {
-        await _updateValidator.ValidateAndThrowAsync(req, ct);
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
+        await _atualizarValidator.ValidateAndThrowAsync(req, ct);
+        var peca = await _repo.ObterOuFalharAsync(id, NaoEncontrado, ct);
         peca.Atualizar(req.Nome, Money.From(req.ValorUnitario));
-        _repo.Update(peca);
-        await _uow.SaveChangesAsync(ct);
-        return Map(peca);
-    }
-
-    public async Task<PecaInsumoResponse> ReabastecerAsync(Guid id, ReabastecerEstoqueRequest req, CancellationToken ct = default)
-    {
-        await _reabastecerValidator.ValidateAndThrowAsync(req, ct);
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
-        peca.Repor(req.Quantidade);
-        _repo.Update(peca);
         await _uow.SaveChangesAsync(ct);
         return Map(peca);
     }
 
     public async Task<PecaInsumoResponse> ObterAsync(Guid id, CancellationToken ct = default)
-    {
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
-        return Map(peca);
-    }
+        => Map(await _repo.ObterOuFalharAsync(id, NaoEncontrado, ct));
 
     public async Task<IReadOnlyList<PecaInsumoResponse>> ListarAsync(CancellationToken ct = default)
         => (await _repo.ListAsync(ct)).Select(Map).ToList();
 
     public async Task RemoverAsync(Guid id, CancellationToken ct = default)
     {
-        var peca = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException(NaoEncontrado);
+        var peca = await _repo.ObterOuFalharAsync(id, NaoEncontrado, ct);
         _repo.Remove(peca);
         await _uow.SaveChangesAsync(ct);
     }
 
-    private static PecaInsumoResponse Map(PecaInsumo p)
-        => new(p.Id, p.Nome, p.ValorUnitario.Valor, p.QuantidadeEmEstoque);
+    private static PecaInsumoResponse Map(PecaInsumo p) => new(p.Id, p.Nome, p.ValorUnitario.Valor);
 }

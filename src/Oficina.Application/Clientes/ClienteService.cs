@@ -13,12 +13,12 @@ public sealed class ClienteService
 {
     private readonly IClienteRepository _repo;
     private readonly IUnitOfWork _uow;
-    private readonly IValidator<CreateClienteRequest> _createValidator;
-    private readonly IValidator<UpdateClienteRequest> _updateValidator;
+    private readonly IValidator<CriarClienteRequest> _createValidator;
+    private readonly IValidator<AtualizarClienteRequest> _updateValidator;
 
     public ClienteService(IClienteRepository repo, IUnitOfWork uow,
-        IValidator<CreateClienteRequest> createValidator,
-        IValidator<UpdateClienteRequest> updateValidator)
+        IValidator<CriarClienteRequest> createValidator,
+        IValidator<AtualizarClienteRequest> updateValidator)
     {
         _repo = repo;
         _uow = uow;
@@ -26,7 +26,7 @@ public sealed class ClienteService
         _updateValidator = updateValidator;
     }
 
-    public async Task<ClienteResponse> CriarAsync(CreateClienteRequest req, CancellationToken ct = default)
+    public async Task<ClienteResponse> CriarAsync(CriarClienteRequest req, CancellationToken ct = default)
     {
         await _createValidator.ValidateAndThrowAsync(req, ct);
 
@@ -40,10 +40,10 @@ public sealed class ClienteService
         return Map(cliente);
     }
 
-    public async Task<ClienteResponse> AtualizarAsync(Guid id, UpdateClienteRequest req, CancellationToken ct = default)
+    public async Task<ClienteResponse> AtualizarAsync(Guid id, AtualizarClienteRequest req, CancellationToken ct = default)
     {
         await _updateValidator.ValidateAndThrowAsync(req, ct);
-        var cliente = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Cliente nao encontrado.");
+        var cliente = await _repo.ObterOuFalharAsync(id, "Cliente nao encontrado.", ct);
         cliente.Atualizar(req.Nome, req.Email, req.Telefone);
         _repo.Update(cliente);
         await _uow.SaveChangesAsync(ct);
@@ -52,7 +52,7 @@ public sealed class ClienteService
 
     public async Task<ClienteResponse> ObterAsync(Guid id, CancellationToken ct = default)
     {
-        var cliente = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Cliente nao encontrado.");
+        var cliente = await _repo.ObterOuFalharAsync(id, "Cliente nao encontrado.", ct);
         return Map(cliente);
     }
 
@@ -61,11 +61,26 @@ public sealed class ClienteService
 
     public async Task RemoverAsync(Guid id, CancellationToken ct = default)
     {
-        var cliente = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Cliente nao encontrado.");
+        var cliente = await _repo.ObterOuFalharAsync(id, "Cliente nao encontrado.", ct);
         _repo.Remove(cliente);
         await _uow.SaveChangesAsync(ct);
     }
 
+    /// <summary>Inativacao manual: o cliente deixa de conseguir se autenticar pelo CPF.</summary>
+    public Task<ClienteResponse> InativarAsync(Guid id, CancellationToken ct = default)
+        => AlterarStatusAsync(id, c => c.Inativar(), ct);
+
+    public Task<ClienteResponse> ReativarAsync(Guid id, CancellationToken ct = default)
+        => AlterarStatusAsync(id, c => c.Reativar(), ct);
+
+    private async Task<ClienteResponse> AlterarStatusAsync(Guid id, Action<Cliente> acao, CancellationToken ct)
+    {
+        var cliente = await _repo.ObterOuFalharAsync(id, "Cliente nao encontrado.", ct);
+        acao(cliente);
+        await _uow.SaveChangesAsync(ct);
+        return Map(cliente);
+    }
+
     private static ClienteResponse Map(Cliente c)
-        => new(c.Id, c.Nome, c.Documento.Numero, c.Documento.Tipo.ToString(), c.Email, c.Telefone);
+        => new(c.Id, c.Nome, c.Documento.Numero, c.Documento.Tipo.ToString(), c.Email, c.Telefone, c.Ativo, c.InativadoEm);
 }

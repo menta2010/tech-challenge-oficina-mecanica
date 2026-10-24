@@ -4,6 +4,7 @@ using Oficina.Application.Clientes;
 using Oficina.Application.Estoque;
 using Oficina.Application.Servicos;
 using Oficina.Application.Identidade;
+using Oficina.Application.Lojas;
 using Oficina.Application.OrdensServico;
 using Oficina.Application.Veiculos;
 
@@ -20,6 +21,8 @@ public static class DependencyInjection
         services.AddScoped<VeiculoService>();
         services.AddScoped<ServicoService>();
         services.AddScoped<PecaInsumoService>();
+        services.AddScoped<EstoqueService>();
+        services.AddScoped<LojaService>();
         services.AddScoped<AuthService>();
         services.AddScoped<OrdemServicoService>();
 
