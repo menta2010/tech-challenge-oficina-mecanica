@@ -1,0 +1,30 @@
+# Configuracoes NAO sensiveis da API. Valores ${...} sao preenchidos pelo pipeline (envsubst).
+# Segredos (banco, JWT, webhook, New Relic) ficam no Secret "oficina-api-secret", criado pelo
+# pipeline a partir do AWS Secrets Manager - nunca versionados no Git.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-api-config
+  namespace: oficina
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  Swagger__Habilitado: "true"
+  Banco__MigrarNoStartup: "false"          # migrations rodam no Job 02-migracao-job.yaml
+  Jwt__Issuer: "oficina-api"
+  Jwt__Audience: "oficina-clients"
+  Jwt__ExpirationMinutes: "60"
+  Notificacoes__SnsTopicArn: "${SNS_TOPIC_ARN}"
+  AWS_REGION: "${AWS_REGION}"
+  # Agente APM New Relic (.NET)
+  CORECLR_ENABLE_PROFILING: "1"
+  CORECLR_PROFILER: "{36032161-FFC0-4B61-B559-F6C5D41BAE5A}"
+  CORECLR_NEWRELIC_HOME: "/app/newrelic"
+  CORECLR_PROFILER_PATH: "/app/newrelic/libNewRelicProfiler.so"
+  NEW_RELIC_APP_NAME: "oficina-api-${AMBIENTE}"
+  NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: "true"
+  NEW_RELIC_APPLICATION_LOGGING_ENABLED: "true"
+  NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "true"
+  # Envia as propriedades do log (CorrelationId, OrdemServicoId, LojaId...) como atributos "context.*"
+  NEW_RELIC_APPLICATION_LOGGING_FORWARDING_CONTEXT_DATA_ENABLED: "true"
+  NEW_RELIC_LABELS: "ambiente:${AMBIENTE};time:grupo-60"

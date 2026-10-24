@@ -1,0 +1,18 @@
+# NodePort fixo: o NLB interno (repo oficina-infra-k8s) encaminha para a porta 30080 dos nos,
+# e o API Gateway chega ao NLB pelo VPC Link. A API nunca fica exposta diretamente na internet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-api
+  namespace: oficina
+  labels:
+    app: oficina-api
+spec:
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  selector:
+    app: oficina-api
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080

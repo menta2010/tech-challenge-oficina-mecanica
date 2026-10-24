@@ -1,0 +1,48 @@
+# Escalonamento horizontal dos pods por CPU e memoria (metrics-server instalado pelo repo de infra).
+# Se os pods novos nao couberem, o Cluster Autoscaler sobe mais nos (ver ADR-002).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: oficina-api-hpa
+  namespace: oficina
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: oficina-api
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300   # evita "sobe e desce" em picos curtos
+---
+# Garante ao menos 1 replica durante manutencao de nos (drain/autoscaler)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: oficina-api-pdb
+  namespace: oficina
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: oficina-api

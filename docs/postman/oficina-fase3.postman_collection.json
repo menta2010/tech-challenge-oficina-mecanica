@@ -1,0 +1,199 @@
+{
+  "info": {
+    "name": "Oficina Mecânica - Fase 3",
+    "description": "Fluxo completo pela URL do API Gateway: autenticação (Lambda) e API de ordens de serviço (EKS). Configure a variável baseUrl com o output api_endpoint do repositório oficina-infra-k8s. Os scripts de teste guardam tokens e ids automaticamente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://xxxx.execute-api.us-east-1.amazonaws.com" },
+    { "key": "senhaAdmin", "value": "admin123" },
+    { "key": "senhaAtendente", "value": "atendente123" },
+    { "key": "cpf", "value": "52998224725" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "tokenAtendente", "value": "" },
+    { "key": "tokenCliente", "value": "" },
+    { "key": "lojaId", "value": "" },
+    { "key": "clienteId", "value": "" },
+    { "key": "veiculoId", "value": "" },
+    { "key": "servicoId", "value": "" },
+    { "key": "pecaId", "value": "" },
+    { "key": "osId", "value": "" },
+    { "key": "itemServicoId", "value": "" },
+    { "key": "itemPecaId", "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "exec": [ "pm.request.headers.upsert({ key: 'x-correlation-id', value: 'postman-' + Date.now() });" ] }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticação (Lambda)",
+      "item": [
+        {
+          "name": "Login admin",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('tokenAdmin', pm.response.json().token);"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"admin\",\n  \"senha\": \"{{senhaAdmin}}\"\n}" }
+          }
+        },
+        {
+          "name": "Login atendente (Unidade Centro)",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('tokenAtendente', pm.response.json().token);"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"atendente.centro\",\n  \"senha\": \"{{senhaAtendente}}\"\n}" }
+          }
+        },
+        {
+          "name": "CPF inválido (400)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/auth/cpf",
+            "body": { "mode": "raw", "raw": "{ \"cpf\": \"123.456.789-00\" }" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Cadastros (admin)",
+      "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{tokenAdmin}}" } ] },
+      "item": [
+        {
+          "name": "Listar lojas",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "const centro = pm.response.json().find(l => l.nome === 'Unidade Centro');",
+            "pm.collectionVariables.set('lojaId', centro.id);"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/lojas" }
+        },
+        {
+          "name": "Estoque da loja",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('pecaId', pm.response.json()[0].pecaInsumoId);"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/lojas/{{lojaId}}/estoque" }
+        },
+        {
+          "name": "Catálogo de serviços",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('servicoId', pm.response.json()[0].id);"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/servicos" }
+        },
+        {
+          "name": "Criar cliente",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) pm.collectionVariables.set('clienteId', pm.response.json().id);"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/clientes",
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Maria da Demonstração\",\n  \"documento\": \"{{cpf}}\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"11999990000\"\n}" }
+          }
+        },
+        {
+          "name": "Criar veículo",
+          "event": [ { "listen": "prerequest", "script": { "exec": [
+            "pm.collectionVariables.set('placa', 'DEM' + String(Math.floor(Math.random() * 10000)).padStart(4, '0'));"
+          ] } }, { "listen": "test", "script": { "exec": [
+            "if (pm.response.code === 201) pm.collectionVariables.set('veiculoId', pm.response.json().id);"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/veiculos",
+            "body": { "mode": "raw", "raw": "{\n  \"clienteId\": \"{{clienteId}}\",\n  \"placa\": \"{{placa}}\",\n  \"marca\": \"VW\",\n  \"modelo\": \"Gol\",\n  \"ano\": 2020\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Cliente autenticado por CPF",
+      "item": [
+        {
+          "name": "Autenticar com CPF",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('tokenCliente', pm.response.json().token);"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/auth/cpf",
+            "body": { "mode": "raw", "raw": "{ \"cpf\": \"{{cpf}}\" }" }
+          }
+        },
+        {
+          "name": "Rota protegida sem token (401)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/acompanhamento" }
+        },
+        {
+          "name": "Abrir OS (cliente)",
+          "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{tokenCliente}}" } ] },
+          "event": [ { "listen": "test", "script": { "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('osId', pm.response.json().id);"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/ordens-servico",
+            "body": { "mode": "raw", "raw": "{\n  \"lojaId\": \"{{lojaId}}\",\n  \"veiculoId\": \"{{veiculoId}}\",\n  \"servicos\": [ { \"servicoId\": \"{{servicoId}}\" } ],\n  \"pecas\": [ { \"pecaId\": \"{{pecaId}}\", \"quantidade\": 1 } ]\n}" }
+          }
+        },
+        {
+          "name": "Minhas OS",
+          "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{tokenCliente}}" } ] },
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/acompanhamento" }
+        },
+        {
+          "name": "Acompanhar a OS",
+          "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{tokenCliente}}" } ] },
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/acompanhamento/{{osId}}" }
+        }
+      ]
+    },
+    {
+      "name": "4. Fluxo da OS (atendente)",
+      "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{tokenAtendente}}" } ] },
+      "item": [
+        {
+          "name": "Listagem operacional (sem encerradas)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/ordens-servico" }
+        },
+        {
+          "name": "Finalizar diagnóstico (gera orçamento)",
+          "event": [ { "listen": "test", "script": { "exec": [
+            "const os = pm.response.json();",
+            "pm.collectionVariables.set('itemServicoId', os.servicos[0].id);",
+            "pm.collectionVariables.set('itemPecaId', os.pecas[0].id);"
+          ] } } ],
+          "request": { "method": "POST", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}/finalizar-diagnostico" }
+        },
+        { "name": "Aprovar orçamento", "request": { "method": "POST", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}/aprovar" } },
+        { "name": "Executar serviço", "request": { "method": "POST", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}/servicos/{{itemServicoId}}/executar" } },
+        { "name": "Usar peça (baixa estoque da loja)", "request": { "method": "POST", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}/pecas/{{itemPecaId}}/usar" } },
+        { "name": "Finalizar execução", "request": { "method": "POST", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}/finalizar-execucao" } },
+        { "name": "Entregar veículo", "request": { "method": "POST", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}/entregar" } },
+        { "name": "Detalhe com histórico de status", "request": { "method": "GET", "url": "{{baseUrl}}/api/ordens-servico/{{osId}}" } },
+        { "name": "Listagem com encerradas", "request": { "method": "GET", "url": "{{baseUrl}}/api/ordens-servico?incluirEncerradas=true" } },
+        { "name": "Relatório: tempo por status", "request": { "method": "GET", "url": "{{baseUrl}}/api/ordens-servico/relatorios/tempo-por-status" } }
+      ]
+    }
+  ]
+}
