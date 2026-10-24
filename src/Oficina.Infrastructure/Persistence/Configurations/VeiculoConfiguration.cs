@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Oficina.Domain.Clientes;
 using Oficina.Domain.Veiculos;
 
 namespace Oficina.Infrastructure.Persistence.Configurations;
@@ -21,5 +22,7 @@ public sealed class VeiculoConfiguration : IEntityTypeConfiguration<Veiculo>
             .IsRequired();
         b.HasIndex(v => v.Placa).IsUnique();
         b.HasIndex(v => v.ClienteId);
+        // Integridade: veiculo sempre pertence a um cliente existente
+        b.HasOne<Cliente>().WithMany().HasForeignKey(v => v.ClienteId).OnDelete(DeleteBehavior.Restrict);
     }
 }
