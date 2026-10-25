@@ -1,12 +1,12 @@
 name: CI/CD
 
 # PR: build, testes (unitarios + integracao com PostgreSQL real), imagem e scan de vulnerabilidades.
-# develop -> deploy em homolog | main -> deploy em prod (EKS), com migrations e smoke test ponta a ponta.
+# develop -> deploy em homolog | master -> deploy em prod (EKS), com migrations e smoke test ponta a ponta.
 on:
   pull_request:
-    branches: [ develop, main ]
+    branches: [ develop, master ]
   push:
-    branches: [ develop, main ]
+    branches: [ develop, master ]
   workflow_dispatch:
 
 concurrency:
@@ -72,13 +72,13 @@ jobs:
           path: trivy-report.txt
 
   deploy:
-    name: Deploy EKS (${{ github.ref_name == 'main' && 'prod' || 'homolog' }})
+    name: Deploy EKS (${{ github.ref_name == 'master' && 'prod' || 'homolog' }})
     needs: [ build-test, image-scan ]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
+    environment: ${{ github.ref_name == 'master' && 'prod' || 'homolog' }}
     env:
-      AMBIENTE: ${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
+      AMBIENTE: ${{ github.ref_name == 'master' && 'prod' || 'homolog' }}
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
     steps:
       - uses: actions/checkout@v4

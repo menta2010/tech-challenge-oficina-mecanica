@@ -143,9 +143,9 @@ No Swagger, use **Authorize** com `Bearer <token>`. O webhook de orçamento (`PO
 
 | Evento | Etapas |
 | --- | --- |
-| Pull Request para `develop` ou `main` | Build · 94 testes (integração com PostgreSQL real) · build da imagem · scan Trivy |
+| Pull Request para `develop` ou `master` | Build · 94 testes (integração com PostgreSQL real) · build da imagem · scan Trivy |
 | Merge em `develop` | Tudo acima + deploy em **homolog** |
-| Merge em `main` | Tudo acima + deploy em **prod** |
+| Merge em `master` | Tudo acima + deploy em **prod** |
 
 Etapas do deploy:
 
@@ -170,7 +170,7 @@ Etapas do deploy:
 1. Environments `homolog` e `prod`:
    - Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (AWS Academy), `NEW_RELIC_LICENSE_KEY`, `SEED_ADMIN_PASSWORD` e `SEED_ATENDENTE_PASSWORD`.
    - Variable: `AWS_REGION` (padrão `us-east-1`).
-2. Proteção das branches `main` e `develop`: Pull Request obrigatório, checks `Build & Test` e `Docker image + Trivy` obrigatórios, push direto bloqueado.
+2. Proteção das branches `master` e `develop`: Pull Request obrigatório, checks `Build & Test` e `Docker image + Trivy` obrigatórios, push direto bloqueado.
 3. Colaborador `soat-architecture` com acesso de leitura.
 
 ## Histórico
