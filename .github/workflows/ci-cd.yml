@@ -1,31 +1,29 @@
 name: CI/CD
 
+# PR: build, testes (unitarios + integracao com PostgreSQL real), imagem e scan de vulnerabilidades.
+# develop -> deploy em homolog | master -> deploy em prod (EKS), com migrations e smoke test ponta a ponta.
 on:
-  push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
+    branches: [ develop, master ]
+  push:
+    branches: [ develop, master ]
   workflow_dispatch:
 
 concurrency:
-  group: ci-cd-${{ github.ref }}
-  cancel-in-progress: true
+  group: app-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
   DOTNET_VERSION: '8.0.x'
 
 jobs:
-  # 1) Build + testes (unitarios e de integracao com Testcontainers)
   build-test:
     name: Build & Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -35,6 +33,7 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # Integracao usa Testcontainers (PostgreSQL 16 real no Docker do runner)
       - name: Test (com cobertura)
         run: dotnet test --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory ./coverage
 
@@ -45,133 +44,136 @@ jobs:
           name: coverage
           path: ./coverage
 
-  # 2) Validacao estatica da infraestrutura como codigo
-  infra-validate:
-    name: Terraform validate
+  image-scan:
+    name: Docker image + Trivy
+    needs: build-test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Build da imagem
+        run: docker build -t oficina-api:${{ github.sha }} .
+
+      - name: Trivy (vulnerabilidades da imagem)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          terraform_version: '1.13.0'
+          image-ref: oficina-api:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: table
+          output: trivy-report.txt
+          exit-code: '0'
 
-      - name: Terraform format
-        working-directory: infra
-        run: terraform fmt -check
+      - name: Upload relatorio Trivy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
 
-      - name: Terraform init
-        working-directory: infra
-        run: terraform init -backend=false -input=false
-
-      - name: Terraform validate
-        working-directory: infra
-        run: terraform validate
-
-  # 3) Build da imagem Docker e push para o GitHub Container Registry (GHCR)
-  docker-image:
-    name: Docker image
-    needs: [build-test, infra-validate]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+  deploy:
+    name: Deploy EKS (${{ github.ref_name == 'master' && 'prod' || 'homolog' }})
+    needs: [ build-test, image-scan ]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    environment: ${{ github.ref_name == 'master' && 'prod' || 'homolog' }}
+    env:
+      AMBIENTE: ${{ github.ref_name == 'master' && 'prod' || 'homolog' }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - name: Credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Metadata (tags)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=sha
-
-      - name: Build & push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  # 4) Deploy em Kubernetes (cluster kind efemero no runner) + banco + aplicacao dos manifestos
-  deploy-k8s:
-    name: Deploy to Kubernetes
-    needs: docker-image
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Create kind cluster
-        uses: helm/kind-action@v1
-        with:
-          cluster_name: oficina
-
-      - name: Install metrics-server for HPA
+      - name: Descobrir recursos do ambiente (criados pelos repositorios de infra)
         run: |
-          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
-          if ! kubectl -n kube-system get deploy metrics-server \
-            -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -q -- '--kubelet-insecure-tls'; then
-            kubectl -n kube-system patch deployment metrics-server --type=json \
-              -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          ECR=$(aws ecr describe-repositories --repository-names "oficina-${AMBIENTE}-api" --query 'repositories[0].repositoryUri' --output text)
+          SNS=$(aws sns list-topics --query "Topics[?ends_with(TopicArn, ':oficina-${AMBIENTE}-notificacoes-os')].TopicArn | [0]" --output text)
+          API=$(aws apigatewayv2 get-apis --query "Items[?Name=='oficina-${AMBIENTE}-api'].ApiEndpoint | [0]" --output text)
+          VERSAO=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          {
+            echo "ECR=${ECR}"
+            echo "SNS_TOPIC_ARN=${SNS}"
+            echo "API_URL=${API}"
+            echo "VERSAO=${VERSAO}"
+            echo "IMAGEM=${ECR}:${VERSAO}"
+          } >> "$GITHUB_ENV"
+
+      - name: Login no ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build e push da imagem
+        run: |
+          docker build -t "${IMAGEM}" -t "${ECR}:${AMBIENTE}-latest" .
+          docker push "${IMAGEM}"
+          docker push "${ECR}:${AMBIENTE}-latest"
+
+      - name: kubeconfig
+        run: aws eks update-kubeconfig --name "oficina-${AMBIENTE}-eks" --region "${AWS_REGION}"
+
+      - name: Secret da aplicacao (a partir do Secrets Manager)
+        run: |
+          DB=$(aws secretsmanager get-secret-value --secret-id "oficina/${AMBIENTE}/db" --query SecretString --output text)
+          JWT=$(aws secretsmanager get-secret-value --secret-id "oficina/${AMBIENTE}/jwt" --query SecretString --output text)
+          WEBHOOK=$(aws secretsmanager get-secret-value --secret-id "oficina/${AMBIENTE}/webhook" --query SecretString --output text)
+          CONN="Host=$(jq -r .host <<<"$DB");Port=$(jq -r .port <<<"$DB");Database=$(jq -r .dbname <<<"$DB");Username=$(jq -r .username <<<"$DB");Password=$(jq -r .password <<<"$DB");SSL Mode=Require"
+
+          kubectl apply -f k8s/00-namespace.yaml
+          kubectl -n oficina create secret generic oficina-api-secret \
+            --from-literal=ConnectionStrings__Default="${CONN}" \
+            --from-literal=Jwt__SecretKey="${JWT}" \
+            --from-literal=ExternalApproval__Token="${WEBHOOK}" \
+            --from-literal=NEW_RELIC_LICENSE_KEY="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            --from-literal=SEED_ADMIN_PASSWORD="${{ secrets.SEED_ADMIN_PASSWORD }}" \
+            --from-literal=SEED_ATENDENTE_PASSWORD="${{ secrets.SEED_ATENDENTE_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Migrations (Job) antes do deploy
+        run: |
+          VARS='${IMAGEM} ${VERSAO} ${AMBIENTE} ${SNS_TOPIC_ARN} ${AWS_REGION}'
+          envsubst "$VARS" < k8s/01-configmap.yaml | kubectl apply -f -
+          envsubst "$VARS" < k8s/02-migracao-job.yaml | kubectl apply -f -
+          if ! kubectl -n oficina wait --for=condition=complete "job/oficina-migracao-${VERSAO}" --timeout=300s; then
+            kubectl -n oficina logs "job/oficina-migracao-${VERSAO}" --tail=100 || true
+            exit 1
           fi
-          kubectl -n kube-system rollout status deploy/metrics-server --timeout=180s
 
-      - name: Build image and load into kind
+      - name: Deploy da API (rolling update sem indisponibilidade)
         run: |
-          docker build -t ghcr.io/${{ github.repository }}:latest .
-          kind load docker-image ghcr.io/${{ github.repository }}:latest --name oficina
-
-      - name: Apply manifests (namespace, banco, API, HPA)
-        run: kubectl apply -f k8s/
-
-      - name: Wait for rollout
-        run: |
-          kubectl -n oficina rollout status deploy/oficina-postgres --timeout=180s
-          kubectl -n oficina rollout status deploy/oficina-api --timeout=180s
-
-      - name: Verify metrics and HPA
-        run: |
-          for attempt in {1..12}; do
-            if kubectl top pods -n oficina; then
-              kubectl -n oficina get hpa oficina-api-hpa
-              exit 0
-            fi
-            echo "Aguardando metricas (${attempt}/12)..."
-            sleep 5
+          VARS='${IMAGEM} ${VERSAO} ${AMBIENTE} ${SNS_TOPIC_ARN} ${AWS_REGION}'
+          for f in k8s/03-deployment.yaml k8s/04-service.yaml k8s/05-hpa.yaml; do
+            envsubst "$VARS" < "$f" | kubectl apply -f -
           done
-          echo "Metrics Server nao disponibilizou metricas dentro do prazo."
-          exit 1
+          kubectl -n oficina rollout status deploy/oficina-api --timeout=300s
+          kubectl -n oficina get pods,svc,hpa -o wide
 
-      - name: Smoke test (/health/ready)
+      - name: Smoke test ponta a ponta (API Gateway -> Lambda -> EKS -> RDS)
         run: |
-          kubectl -n oficina port-forward svc/oficina-api 8080:80 &
-          sleep 8
-          http_status=$(curl --silent --show-error --connect-timeout 5 --max-time 15 \
-            --output /tmp/health-body --write-out "%{http_code}" \
-            http://localhost:8080/health/ready)
-          health_body=$(tr -d '\r\n' < /tmp/health-body)
-          test "$http_status" = "200"
-          test "$health_body" = "Healthy"
+          set -e
+          for i in $(seq 1 12); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "${API_URL}/health/ready") && [ "$status" = "200" ] && break
+            echo "Aguardando o NLB registrar os nos (${i}/12, status ${status})"; sleep 10
+          done
+          test "$status" = "200"
 
-      - name: Diagnostics on failure
+          TOKEN=$(curl -sf -X POST "${API_URL}/auth/login" -H "Content-Type: application/json" \
+            -H "x-correlation-id: smoke-${VERSAO}" \
+            -d "{\"usuario\":\"admin\",\"senha\":\"${{ secrets.SEED_ADMIN_PASSWORD }}\"}" | jq -r .token)
+          test -n "$TOKEN" && test "$TOKEN" != "null"
+
+          status=$(curl -s -o /dev/null -w "%{http_code}" "${API_URL}/api/lojas" -H "Authorization: Bearer ${TOKEN}")
+          test "$status" = "200"
+          echo "Deploy ${VERSAO} validado em ${API_URL} (Swagger: ${API_URL}/swagger)"
+
+      - name: Diagnostico em caso de falha
         if: failure()
         run: |
-          kubectl -n oficina get pods,svc,hpa || true
-          kubectl -n oficina describe pods || true
+          kubectl -n oficina get pods,svc,hpa,jobs || true
+          kubectl -n oficina describe pods -l app=oficina-api || true
           kubectl -n oficina logs deploy/oficina-api --tail=100 || true

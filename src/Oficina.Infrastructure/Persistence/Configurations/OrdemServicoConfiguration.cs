@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Oficina.Domain.Clientes;
+using Oficina.Domain.Lojas;
 using Oficina.Domain.OrdensServico;
+using Oficina.Domain.Veiculos;
 
 namespace Oficina.Infrastructure.Persistence.Configurations;
 
@@ -13,23 +16,23 @@ public sealed class OrdemServicoConfiguration : IEntityTypeConfiguration<OrdemSe
         b.HasKey(o => o.Id);
         b.Property(o => o.Id).ValueGeneratedNever();
 
-        b.Property(o => o.ClienteId).IsRequired();
-        b.Property(o => o.VeiculoId).IsRequired();
         b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
+        b.Property(o => o.Encerrada).IsRequired();
 
         b.Property(o => o.CriadaEm).IsRequired();
-        b.Property(o => o.DiagnosticoIniciadoEm);
-        b.Property(o => o.ExecucaoIniciadaEm);
-        b.Property(o => o.ExecucaoFinalizadaEm);
-        b.Property(o => o.EntregueEm);
-        b.Property(o => o.CanceladaEm);
-
         b.Ignore(o => o.TempoExecucao);
 
-        b.HasIndex(o => o.Status);
+        // Integridade referencial (antes eram so colunas Guid soltas)
+        b.HasOne<Loja>().WithMany().HasForeignKey(o => o.LojaId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Cliente>().WithMany().HasForeignKey(o => o.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Veiculo>().WithMany().HasForeignKey(o => o.VeiculoId).OnDelete(DeleteBehavior.Restrict);
+
+        // Listagem operacional (exclusao logica): WHERE Encerrada = false AND LojaId = ? ORDER BY Status, CriadaEm
+        b.HasIndex(o => new { o.Encerrada, o.LojaId, o.Status, o.CriadaEm })
+            .HasDatabaseName("IX_OrdensServico_Listagem");
         b.HasIndex(o => o.ClienteId);
 
-        // Orcamento: owned na mesma tabela (colunas prefixadas) - funciona bem (nao e colecao)
+        // Orcamento: owned na mesma tabela (colunas prefixadas)
         b.OwnsOne(o => o.Orcamento, ob =>
         {
             ob.Property(x => x.ValorServicos).HasConversion(Converters.Money).HasColumnType("numeric(18,2)").HasColumnName("Orcamento_ValorServicos");
@@ -39,11 +42,28 @@ public sealed class OrdemServicoConfiguration : IEntityTypeConfiguration<OrdemSe
             ob.Property(x => x.GeradoEm).HasColumnName("Orcamento_GeradoEm");
         });
 
-        // Itens como entidades normais (relacao 1-N). Mesmo schema das tabelas anteriores.
+        // Itens e historico como entidades filhas (relacao 1-N)
         b.HasMany(o => o.Servicos).WithOne().HasForeignKey("OrdemServicoId").OnDelete(DeleteBehavior.Cascade);
         b.Navigation(o => o.Servicos).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         b.HasMany(o => o.Pecas).WithOne().HasForeignKey("OrdemServicoId").OnDelete(DeleteBehavior.Cascade);
         b.Navigation(o => o.Pecas).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        b.HasMany(o => o.Historico).WithOne().HasForeignKey("OrdemServicoId").OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(o => o.Historico).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+public sealed class HistoricoStatusOSConfiguration : IEntityTypeConfiguration<HistoricoStatusOS>
+{
+    public void Configure(EntityTypeBuilder<HistoricoStatusOS> b)
+    {
+        b.ToTable("HistoricoStatusOS");
+        b.HasKey(h => h.Id);
+        b.Property(h => h.Id).ValueGeneratedNever();
+        b.Property(h => h.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
+        b.Property(h => h.Inicio).IsRequired();
+        b.Ignore(h => h.Duracao);
+        b.HasIndex("OrdemServicoId", nameof(HistoricoStatusOS.Inicio));
     }
 }

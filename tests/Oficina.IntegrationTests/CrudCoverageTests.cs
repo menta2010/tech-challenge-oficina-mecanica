@@ -24,18 +24,18 @@ public class CrudCoverageTests
         var client = await _factory.CreateAuthenticatedClientAsync();
 
         var cli = await Post<ClienteResponse>(client, "/api/clientes",
-            new CreateClienteRequest("Ana", TestHelpers.GerarCpf(), "ana@ex.com", "1199"));
+            new CriarClienteRequest("Ana", TestHelpers.GerarCpf(), "ana@ex.com", "1199"));
         (await client.GetAsync($"/api/clientes/{cli.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.GetAsync("/api/clientes")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.PutAsJsonAsync($"/api/clientes/{cli.Id}",
-            new UpdateClienteRequest("Ana Maria", "ana2@ex.com", "2200"))).StatusCode.Should().Be(HttpStatusCode.OK);
+            new AtualizarClienteRequest("Ana Maria", "ana2@ex.com", "2200"))).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var vei = await Post<VeiculoResponse>(client, "/api/veiculos",
-            new CreateVeiculoRequest(cli.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
+            new CriarVeiculoRequest(cli.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
         (await client.GetAsync($"/api/veiculos/{vei.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.GetAsync($"/api/veiculos?clienteId={cli.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.PutAsJsonAsync($"/api/veiculos/{vei.Id}",
-            new UpdateVeiculoRequest("Fiat", "Uno", 2018))).StatusCode.Should().Be(HttpStatusCode.OK);
+            new AtualizarVeiculoRequest("Fiat", "Uno", 2018))).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.DeleteAsync($"/api/veiculos/{vei.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         (await client.DeleteAsync($"/api/clientes/{cli.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -48,18 +48,18 @@ public class CrudCoverageTests
         var client = await _factory.CreateAuthenticatedClientAsync();
 
         var s = await Post<ServicoResponse>(client, "/api/servicos",
-            new CreateServicoRequest("Lavagem", 50m, 30, "simples"));
+            new CriarServicoRequest("Lavagem", 50m, 30, "simples"));
         (await client.GetAsync($"/api/servicos/{s.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.PutAsJsonAsync($"/api/servicos/{s.Id}",
-            new UpdateServicoRequest("Lavagem completa", 60m, 40, "detalhada"))).StatusCode.Should().Be(HttpStatusCode.OK);
+            new AtualizarServicoRequest("Lavagem completa", 60m, 40, "detalhada"))).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.DeleteAsync($"/api/servicos/{s.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         var p = await Post<PecaInsumoResponse>(client, "/api/pecas-insumos",
-            new CreatePecaInsumoRequest("Vela", 20m, 5));
+            new CriarPecaInsumoRequest($"Vela {Guid.NewGuid():N}", 20m));
         (await client.GetAsync($"/api/pecas-insumos/{p.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.PutAsJsonAsync($"/api/pecas-insumos/{p.Id}",
-            new UpdatePecaInsumoRequest("Vela NGK", 22m))).StatusCode.Should().Be(HttpStatusCode.OK);
-        var reab = await client.PostAsJsonAsync($"/api/pecas-insumos/{p.Id}/reabastecer",
+            new AtualizarPecaInsumoRequest("Vela NGK", 22m))).StatusCode.Should().Be(HttpStatusCode.OK);
+        var reab = await client.PostAsJsonAsync($"/api/lojas/{await client.ObterLojaCentroAsync()}/estoque/{p.Id}/reabastecer",
             new ReabastecerEstoqueRequest(10));
         reab.StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.DeleteAsync($"/api/pecas-insumos/{p.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -71,14 +71,14 @@ public class CrudCoverageTests
         var client = await _factory.CreateAuthenticatedClientAsync();
 
         var cli = await Post<ClienteResponse>(client, "/api/clientes",
-            new CreateClienteRequest("Cli", TestHelpers.GerarCpf(), null, null));
+            new CriarClienteRequest("Cli", TestHelpers.GerarCpf(), null, null));
         var vei = await Post<VeiculoResponse>(client, "/api/veiculos",
-            new CreateVeiculoRequest(cli.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
+            new CriarVeiculoRequest(cli.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
         var servicos = await client.GetFromJsonAsync<List<ServicoResponse>>("/api/servicos");
         var pecas = await client.GetFromJsonAsync<List<PecaInsumoResponse>>("/api/pecas-insumos");
 
         var os = await Post<OrdemServicoResponse>(client, "/api/ordens-servico",
-            new CriarOrdemServicoRequest(cli.Id, vei.Id));
+            new CriarOrdemServicoRequest(await client.ObterLojaCentroAsync(), cli.Id, vei.Id));
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/iniciar-diagnostico", new { });
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/servicos",
             new AdicionarServicoRequest(servicos![0].Id));

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Falha no processamento de OS",
+    "query": "SELECT count(*) FROM OrdemServicoEvento WHERE evento = 'falha' AND inesperada IS true AND appName = 'oficina-api-__AMBIENTE__'",
+    "operator": "ABOVE", "threshold": 0, "duracao": 300, "prioridade": "CRITICAL"
+  },
+  {
+    "name": "Notificacao de OS nao publicada no SNS",
+    "query": "SELECT count(*) FROM Log WHERE entity.name = 'oficina-api-__AMBIENTE__' AND message LIKE 'Falha ao publicar notificacao%'",
+    "operator": "ABOVE", "threshold": 0, "duracao": 300, "prioridade": "WARNING"
+  },
+  {
+    "name": "Taxa de erro da API acima de 5%",
+    "query": "SELECT percentage(count(*), WHERE error IS true) FROM Transaction WHERE appName = 'oficina-api-__AMBIENTE__'",
+    "operator": "ABOVE", "threshold": 5, "duracao": 300, "prioridade": "CRITICAL"
+  },
+  {
+    "name": "Latencia p95 da API acima de 1 s",
+    "query": "SELECT percentile(duration, 95) FROM Transaction WHERE appName = 'oficina-api-__AMBIENTE__'",
+    "operator": "ABOVE", "threshold": 1, "duracao": 300, "prioridade": "WARNING"
+  },
+  {
+    "name": "Containers da API reiniciando",
+    "query": "SELECT sum(restartCountDelta) FROM K8sContainerSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina'",
+    "operator": "ABOVE", "threshold": 2, "duracao": 600, "prioridade": "WARNING"
+  },
+  {
+    "name": "HPA no teto de replicas",
+    "query": "SELECT latest(currentReplicas) FROM K8sHpaSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina'",
+    "operator": "ABOVE_OR_EQUALS", "threshold": 8, "duracao": 600, "prioridade": "WARNING"
+  },
+  {
+    "name": "Health check externo falhando",
+    "query": "SELECT count(*) FROM SyntheticCheck WHERE monitorName = 'oficina-health-__AMBIENTE__' AND result != 'SUCCESS'",
+    "operator": "ABOVE", "threshold": 1, "duracao": 600, "prioridade": "CRITICAL"
+  }
+]

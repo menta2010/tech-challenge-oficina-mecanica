@@ -2,9 +2,9 @@ using FluentValidation;
 
 namespace Oficina.Application.Veiculos;
 
-public sealed class CreateVeiculoValidator : AbstractValidator<CreateVeiculoRequest>
+public sealed class CriarVeiculoValidator : AbstractValidator<CriarVeiculoRequest>
 {
-    public CreateVeiculoValidator()
+    public CriarVeiculoValidator()
     {
         RuleFor(x => x.ClienteId).NotEmpty();
         RuleFor(x => x.Placa).NotEmpty();
@@ -14,9 +14,9 @@ public sealed class CreateVeiculoValidator : AbstractValidator<CreateVeiculoRequ
     }
 }
 
-public sealed class UpdateVeiculoValidator : AbstractValidator<UpdateVeiculoRequest>
+public sealed class AtualizarVeiculoValidator : AbstractValidator<AtualizarVeiculoRequest>
 {
-    public UpdateVeiculoValidator()
+    public AtualizarVeiculoValidator()
     {
         RuleFor(x => x.Marca).NotEmpty().MaximumLength(80);
         RuleFor(x => x.Modelo).NotEmpty().MaximumLength(120);

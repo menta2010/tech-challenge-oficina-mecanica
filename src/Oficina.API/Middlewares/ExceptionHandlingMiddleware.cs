@@ -1,14 +1,18 @@
-using System.Text.Json;
 using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Oficina.Application.Common;
 using Oficina.Domain.Shared;
 
 namespace Oficina.API.Middlewares;
 
 /// <summary>
-/// Traduz excecoes em respostas HTTP consistentes:
-/// ValidationException/DomainException -> 400, ConflictException -> 409,
-/// NotFoundException -> 404, demais -> 500.
+/// Traduz excecoes em respostas no padrao Problem Details (RFC 7807), sempre com o
+/// correlationId para rastrear o erro nos logs:
+/// ValidationException/DomainException -> 400, UnauthorizedException -> 401,
+/// ForbiddenException -> 403, NotFoundException -> 404, ConflictException e violacao de
+/// integridade no banco -> 409, demais -> 500 (sem expor detalhes internos).
 /// </summary>
 public sealed class ExceptionHandlingMiddleware
 {
@@ -27,39 +31,50 @@ public sealed class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
-        catch (ValidationException ex)
-        {
-            var erros = ex.Errors.Select(e => new { campo = e.PropertyName, mensagem = e.ErrorMessage });
-            await WriteAsync(context, StatusCodes.Status400BadRequest, "Erro de validacao.", erros);
-        }
-        catch (UnauthorizedException ex)
-        {
-            await WriteAsync(context, StatusCodes.Status401Unauthorized, ex.Message);
-        }
-        catch (NotFoundException ex)
-        {
-            await WriteAsync(context, StatusCodes.Status404NotFound, ex.Message);
-        }
-        catch (ConflictException ex)
-        {
-            await WriteAsync(context, StatusCodes.Status409Conflict, ex.Message);
-        }
-        catch (DomainException ex)
-        {
-            await WriteAsync(context, StatusCodes.Status400BadRequest, ex.Message);
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro nao tratado.");
-            await WriteAsync(context, StatusCodes.Status500InternalServerError, "Erro interno do servidor.");
+            var (status, titulo, erros) = Classificar(ex);
+
+            if (status >= StatusCodes.Status500InternalServerError)
+                _logger.LogError(ex, "Erro nao tratado em {Metodo} {Rota}", context.Request.Method, context.Request.Path);
+            else
+                _logger.LogWarning("Requisicao recusada ({Status}) em {Metodo} {Rota}: {Motivo}",
+                    status, context.Request.Method, context.Request.Path, ex.Message);
+
+            await EscreverAsync(context, status, titulo,
+                status >= StatusCodes.Status500InternalServerError ? "Erro interno do servidor." : ex.Message, erros);
         }
     }
 
-    private static async Task WriteAsync(HttpContext context, int status, string mensagem, object? detalhes = null)
+    private static (int Status, string Titulo, object? Erros) Classificar(Exception ex) => ex switch
     {
+        ValidationException v when v.Errors.Any() => (StatusCodes.Status400BadRequest, "Erro de validacao",
+            v.Errors.Select(e => new { campo = e.PropertyName, mensagem = e.ErrorMessage })),
+        ValidationException or DomainException => (StatusCodes.Status400BadRequest, "Regra de negocio violada", null),
+        UnauthorizedException => (StatusCodes.Status401Unauthorized, "Nao autenticado", null),
+        ForbiddenException => (StatusCodes.Status403Forbidden, "Acesso negado", null),
+        NotFoundException => (StatusCodes.Status404NotFound, "Recurso nao encontrado", null),
+        ConflictException => (StatusCodes.Status409Conflict, "Conflito", null),
+        DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation } } =>
+            (StatusCodes.Status409Conflict, "Registro em uso", null),
+        DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } =>
+            (StatusCodes.Status409Conflict, "Registro duplicado", null),
+        _ => (StatusCodes.Status500InternalServerError, "Erro interno", null)
+    };
+
+    private static async Task EscreverAsync(HttpContext context, int status, string titulo, string detalhe, object? erros)
+    {
+        var problema = new ProblemDetails
+        {
+            Status = status,
+            Title = titulo,
+            Detail = detalhe,
+            Instance = context.Request.Path
+        };
+        problema.Extensions["correlationId"] = CorrelacaoMiddleware.Obter(context);
+        if (erros is not null) problema.Extensions["erros"] = erros;
+
         context.Response.StatusCode = status;
-        context.Response.ContentType = "application/json";
-        var payload = JsonSerializer.Serialize(new { status, mensagem, detalhes });
-        await context.Response.WriteAsync(payload);
+        await context.Response.WriteAsJsonAsync(problema, options: null, contentType: "application/problem+json");
     }
 }

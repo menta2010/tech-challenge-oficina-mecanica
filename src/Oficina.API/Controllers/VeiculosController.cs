@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Oficina.Domain.Identidade;
 using Oficina.Application.Veiculos;
 
 namespace Oficina.API.Controllers;
 
 /// <summary>CRUD de veiculos (placa, marca, modelo, ano). Requisito: cadastro/gestao de veiculos.</summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = Perfis.Funcionarios)]
 [Route("api/veiculos")]
 public class VeiculosController : ControllerBase
 {
@@ -14,7 +15,7 @@ public class VeiculosController : ControllerBase
     public VeiculosController(VeiculoService service) => _service = service;
 
     [HttpPost]
-    public async Task<IActionResult> Criar(CreateVeiculoRequest req, CancellationToken ct)
+    public async Task<IActionResult> Criar(CriarVeiculoRequest req, CancellationToken ct)
     {
         var r = await _service.CriarAsync(req, ct);
         return CreatedAtAction(nameof(Obter), new { id = r.Id }, r);
@@ -28,7 +29,7 @@ public class VeiculosController : ControllerBase
     public async Task<IActionResult> Obter(Guid id, CancellationToken ct) => Ok(await _service.ObterAsync(id, ct));
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Atualizar(Guid id, UpdateVeiculoRequest req, CancellationToken ct)
+    public async Task<IActionResult> Atualizar(Guid id, AtualizarVeiculoRequest req, CancellationToken ct)
         => Ok(await _service.AtualizarAsync(id, req, ct));
 
     [HttpDelete("{id:guid}")]

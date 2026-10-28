@@ -17,7 +17,7 @@ public class ClientesEndpointsTests
     public async Task Criar_ClienteValido_DeveRetornar201()
     {
         var client = await _factory.CreateAuthenticatedClientAsync();
-        var req = new CreateClienteRequest("Maria Souza", TestHelpers.GerarCpf(), "maria@ex.com", "11999999999");
+        var req = new CriarClienteRequest("Maria Souza", TestHelpers.GerarCpf(), "maria@ex.com", "11999999999");
         var resp = await client.PostAsJsonAsync("/api/clientes", req);
         resp.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -30,7 +30,7 @@ public class ClientesEndpointsTests
     public async Task Criar_CpfInvalido_DeveRetornar400()
     {
         var client = await _factory.CreateAuthenticatedClientAsync();
-        var req = new CreateClienteRequest("Fulano", "12345678900", null, null);
+        var req = new CriarClienteRequest("Fulano", "12345678900", null, null);
         var resp = await client.PostAsJsonAsync("/api/clientes", req);
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -40,7 +40,7 @@ public class ClientesEndpointsTests
     {
         var client = await _factory.CreateAuthenticatedClientAsync();
         var cpf = TestHelpers.GerarCpf();
-        var req = new CreateClienteRequest("Cliente A", cpf, null, null);
+        var req = new CriarClienteRequest("Cliente A", cpf, null, null);
 
         (await client.PostAsJsonAsync("/api/clientes", req)).StatusCode.Should().Be(HttpStatusCode.Created);
         var dup = await client.PostAsJsonAsync("/api/clientes", req with { Nome = "Cliente B" });

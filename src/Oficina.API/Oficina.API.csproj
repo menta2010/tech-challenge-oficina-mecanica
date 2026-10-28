@@ -7,6 +7,10 @@
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.6" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="NewRelic.Agent.Api" Version="10.30.0" />
+    <!-- Agente APM .NET: copia o profiler para a pasta newrelic/ do publish (ativado so por variaveis no Kubernetes) -->
+    <PackageReference Include="NewRelic.Agent" Version="10.30.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Oficina.Application\Oficina.Application.csproj" />

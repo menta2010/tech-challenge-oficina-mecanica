@@ -1,0 +1,2 @@
+# Scripts shell sempre com LF (rodam no Linux do GitHub Actions/containers)
+*.sh text eol=lf
