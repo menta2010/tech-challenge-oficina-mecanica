@@ -148,8 +148,12 @@ jobs:
         run: |
           VARS='${IMAGEM} ${VERSAO} ${AMBIENTE} ${SNS_TOPIC_ARN} ${AWS_REGION}'
           for f in k8s/03-deployment.yaml k8s/04-service.yaml k8s/05-hpa.yaml; do
-            envsubst "$VARS" < "$f" | kubectl apply -f -
+            envsubst "$VARS" < "$f" | kubectl apply -f - | tee -a aplicados.txt
           done
+          # Mesma versao (re-run): reinicia os pods para pegarem o Secret e o ConfigMap atualizados
+          if grep -q "deployment.apps/oficina-api unchanged" aplicados.txt; then
+            kubectl -n oficina rollout restart deploy/oficina-api
+          fi
           kubectl -n oficina rollout status deploy/oficina-api --timeout=300s
           kubectl -n oficina get pods,svc,hpa -o wide
 
