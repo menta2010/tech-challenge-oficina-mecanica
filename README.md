@@ -9,19 +9,21 @@ Repositório 4 de 4 do Tech Challenge da Fase 3 (SOAT):
 | [oficina-lambda-auth](https://github.com/menta2010/oficina-lambda-auth) | Lambdas de autenticação (CPF e funcionário) e job de inativação de clientes |
 | [oficina-infra-k8s](https://github.com/menta2010/oficina-infra-k8s) | VPC, EKS, API Gateway, NLB, segredos, SNS, ECR, New Relic |
 | [oficina-infra-db](https://github.com/menta2010/oficina-infra-db) | RDS PostgreSQL, security groups, segredo do banco, modelo ER |
-| **oficina-app** (este) | API de ordens de serviço, manifests Kubernetes, pipeline de deploy |
+| **tech-challenge-oficina-mecanica** (este) | API de ordens de serviço, manifests Kubernetes, pipeline de deploy |
 
 ## Links da entrega
 
 | Item | Link |
 | --- | --- |
-| API (API Gateway, homolog) | `<api_endpoint>` (output do `oficina-infra-k8s`) |
-| Swagger | `<api_endpoint>/swagger` |
+| API publicada (prod) | https://7d2ypan7l9.execute-api.us-east-1.amazonaws.com |
+| Swagger | https://7d2ypan7l9.execute-api.us-east-1.amazonaws.com/swagger |
 | Collection Postman | [docs/postman/oficina-fase3.postman_collection.json](docs/postman/oficina-fase3.postman_collection.json) |
 | Arquitetura (componentes e sequência) | [docs/arquitetura.md](docs/arquitetura.md) |
 | RFCs e ADRs | [docs/rfc](docs/rfc/) · [docs/adr](docs/adr/) |
 | Observabilidade (dashboards e alertas) | [docs/observabilidade.md](docs/observabilidade.md) |
 | Vídeo de demonstração | `<link do YouTube/Vimeo>` |
+
+O ambiente roda no AWS Academy: a URL só responde enquanto o laboratório está ligado.
 
 ## Arquitetura deste repositório
 
