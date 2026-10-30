@@ -1,0 +1,35 @@
+# Aplica as migrations do EF Core e o seed UMA vez antes de cada deploy.
+# Evita que varias replicas tentem migrar o banco ao mesmo tempo no startup.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oficina-migracao-${VERSAO}
+  namespace: oficina
+  labels:
+    app: oficina-migracao
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: oficina-migracao
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: migracao
+          image: ${IMAGEM}
+          args: ["--migrar"]
+          envFrom:
+            - configMapRef:
+                name: oficina-api-config
+            - secretRef:
+                name: oficina-api-secret
+          env:
+            - name: CORECLR_ENABLE_PROFILING   # sem APM no job de migracao
+              value: "0"
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }

@@ -28,20 +28,23 @@ public class OrdemServicoFlowTests
 
         // Cliente + Veiculo
         var cliente = await Post<ClienteResponse>(client, "/api/clientes",
-            new CreateClienteRequest("Joao Cliente", TestHelpers.GerarCpf(), null, null));
+            new CriarClienteRequest("Joao Cliente", TestHelpers.GerarCpf(), null, null));
         var veiculo = await Post<VeiculoResponse>(client, "/api/veiculos",
-            new CreateVeiculoRequest(cliente.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
+            new CriarVeiculoRequest(cliente.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
 
         // Catalogo (seed): pega um servico e uma peca com estoque
         var servicos = await client.GetFromJsonAsync<List<ServicoResponse>>("/api/servicos");
         var pecas = await client.GetFromJsonAsync<List<PecaInsumoResponse>>("/api/pecas-insumos");
         var servico = servicos![0];
-        var peca = pecas!.First(p => p.QuantidadeEmEstoque > 0);
-        var estoqueInicial = peca.QuantidadeEmEstoque;
+        var loja = await client.ObterLojaCentroAsync();
+        var estoqueLoja = await client.GetFromJsonAsync<List<EstoqueLojaResponse>>($"/api/lojas/{loja}/estoque");
+        var saldoInicial = estoqueLoja!.First(e => e.Quantidade > 0);
+        var peca = pecas!.Single(p => p.Id == saldoInicial.PecaInsumoId);
+        var estoqueInicial = saldoInicial.Quantidade;
 
         // Criar OS
         var os = await Post<OrdemServicoResponse>(client, "/api/ordens-servico",
-            new CriarOrdemServicoRequest(cliente.Id, veiculo.Id));
+            new CriarOrdemServicoRequest(await client.ObterLojaCentroAsync(), cliente.Id, veiculo.Id));
         os.Status.Should().Be("Recebida");
 
         // Diagnostico
@@ -72,9 +75,9 @@ public class OrdemServicoFlowTests
         os = await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/pecas/{itemPecaId}/usar", new { });
         os.Pecas[0].Utilizado.Should().BeTrue();
 
-        // Estoque deve ter sido baixado em 1
-        var pecaApos = await client.GetFromJsonAsync<PecaInsumoResponse>($"/api/pecas-insumos/{peca.Id}");
-        pecaApos!.QuantidadeEmEstoque.Should().Be(estoqueInicial - 1);
+        // Estoque da loja da OS deve ter sido baixado em 1
+        var estoqueApos = await client.GetFromJsonAsync<List<EstoqueLojaResponse>>($"/api/lojas/{loja}/estoque");
+        estoqueApos!.Single(e => e.PecaInsumoId == peca.Id).Quantidade.Should().Be(estoqueInicial - 1);
 
         // Finalizar e entregar
         os = await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/finalizar-execucao", new { });
@@ -82,12 +85,18 @@ public class OrdemServicoFlowTests
         os = await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/entregar", new { });
         os.Status.Should().Be("Entregue");
 
-        // Consulta publica (sem autenticacao)
-        var publico = _factory.CreateClient();
-        var acomp = await publico.GetAsync($"/api/acompanhamento/{os.Id}");
+        // Acompanhamento: rota sensivel. Sem token -> 401; cliente dono (token da Lambda) -> 200
+        (await _factory.CreateClient().GetAsync($"/api/acompanhamento/{os.Id}"))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var acomp = await _factory.CreateClienteClient(cliente.Id).GetAsync($"/api/acompanhamento/{os.Id}");
         acomp.StatusCode.Should().Be(HttpStatusCode.OK);
         var andamento = await acomp.Content.ReadFromJsonAsync<AcompanhamentoResponse>();
         andamento!.Status.Should().Be("Entregue");
+
+        // Historico completo de status registrado
+        var detalhe = await client.GetFromJsonAsync<OrdemServicoResponse>($"/api/ordens-servico/{os.Id}");
+        detalhe!.Historico.Select(h => h.Status).Should().Equal(
+            "Recebida", "EmDiagnostico", "AguardandoAprovacao", "EmExecucao", "Finalizada", "Entregue");
 
         // Relatorio de tempo medio
         var rel = await client.GetAsync("/api/ordens-servico/relatorios/tempo-medio");
@@ -100,17 +109,19 @@ public class OrdemServicoFlowTests
         var client = await _factory.CreateAuthenticatedClientAsync();
 
         var cliente = await Post<ClienteResponse>(client, "/api/clientes",
-            new CreateClienteRequest("Sem Estoque", TestHelpers.GerarCpf(), null, null));
+            new CriarClienteRequest("Sem Estoque", TestHelpers.GerarCpf(), null, null));
         var veiculo = await Post<VeiculoResponse>(client, "/api/veiculos",
-            new CreateVeiculoRequest(cliente.Id, TestHelpers.GerarPlaca(), "Fiat", "Uno", 2015));
+            new CriarVeiculoRequest(cliente.Id, TestHelpers.GerarPlaca(), "Fiat", "Uno", 2015));
 
-        // Peca propria com estoque 1
+        // Peca propria com estoque 1 na loja
         var peca = await Post<PecaInsumoResponse>(client, "/api/pecas-insumos",
-            new CreatePecaInsumoRequest("Peca rara", 10m, 1));
+            new CriarPecaInsumoRequest($"Peca rara {Guid.NewGuid():N}", 10m));
+        await Post<EstoqueLojaResponse>(client, $"/api/lojas/{await client.ObterLojaCentroAsync()}/estoque/{peca.Id}/reabastecer",
+            new ReabastecerEstoqueRequest(1));
         var servicos = await client.GetFromJsonAsync<List<ServicoResponse>>("/api/servicos");
 
         var os = await Post<OrdemServicoResponse>(client, "/api/ordens-servico",
-            new CriarOrdemServicoRequest(cliente.Id, veiculo.Id));
+            new CriarOrdemServicoRequest(await client.ObterLojaCentroAsync(), cliente.Id, veiculo.Id));
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/iniciar-diagnostico", new { });
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/servicos",
             new AdicionarServicoRequest(servicos![0].Id));

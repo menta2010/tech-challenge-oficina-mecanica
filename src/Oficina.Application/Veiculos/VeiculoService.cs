@@ -11,11 +11,11 @@ public sealed class VeiculoService
     private readonly IVeiculoRepository _repo;
     private readonly IClienteRepository _clientes;
     private readonly IUnitOfWork _uow;
-    private readonly IValidator<CreateVeiculoRequest> _createValidator;
-    private readonly IValidator<UpdateVeiculoRequest> _updateValidator;
+    private readonly IValidator<CriarVeiculoRequest> _createValidator;
+    private readonly IValidator<AtualizarVeiculoRequest> _updateValidator;
 
     public VeiculoService(IVeiculoRepository repo, IClienteRepository clientes, IUnitOfWork uow,
-        IValidator<CreateVeiculoRequest> createValidator, IValidator<UpdateVeiculoRequest> updateValidator)
+        IValidator<CriarVeiculoRequest> createValidator, IValidator<AtualizarVeiculoRequest> updateValidator)
     {
         _repo = repo;
         _clientes = clientes;
@@ -24,7 +24,7 @@ public sealed class VeiculoService
         _updateValidator = updateValidator;
     }
 
-    public async Task<VeiculoResponse> CriarAsync(CreateVeiculoRequest req, CancellationToken ct = default)
+    public async Task<VeiculoResponse> CriarAsync(CriarVeiculoRequest req, CancellationToken ct = default)
     {
         await _createValidator.ValidateAndThrowAsync(req, ct);
 
@@ -41,10 +41,10 @@ public sealed class VeiculoService
         return Map(veiculo);
     }
 
-    public async Task<VeiculoResponse> AtualizarAsync(Guid id, UpdateVeiculoRequest req, CancellationToken ct = default)
+    public async Task<VeiculoResponse> AtualizarAsync(Guid id, AtualizarVeiculoRequest req, CancellationToken ct = default)
     {
         await _updateValidator.ValidateAndThrowAsync(req, ct);
-        var veiculo = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Veiculo nao encontrado.");
+        var veiculo = await _repo.ObterOuFalharAsync(id, "Veiculo nao encontrado.", ct);
         veiculo.Atualizar(req.Marca, req.Modelo, req.Ano);
         _repo.Update(veiculo);
         await _uow.SaveChangesAsync(ct);
@@ -53,7 +53,7 @@ public sealed class VeiculoService
 
     public async Task<VeiculoResponse> ObterAsync(Guid id, CancellationToken ct = default)
     {
-        var veiculo = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Veiculo nao encontrado.");
+        var veiculo = await _repo.ObterOuFalharAsync(id, "Veiculo nao encontrado.", ct);
         return Map(veiculo);
     }
 
@@ -67,7 +67,7 @@ public sealed class VeiculoService
 
     public async Task RemoverAsync(Guid id, CancellationToken ct = default)
     {
-        var veiculo = await _repo.GetByIdAsync(id, ct) ?? throw new NotFoundException("Veiculo nao encontrado.");
+        var veiculo = await _repo.ObterOuFalharAsync(id, "Veiculo nao encontrado.", ct);
         _repo.Remove(veiculo);
         await _uow.SaveChangesAsync(ct);
     }

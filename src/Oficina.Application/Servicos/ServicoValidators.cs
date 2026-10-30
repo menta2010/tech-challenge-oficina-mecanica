@@ -2,9 +2,9 @@ using FluentValidation;
 
 namespace Oficina.Application.Servicos;
 
-public sealed class CreateServicoValidator : AbstractValidator<CreateServicoRequest>
+public sealed class CriarServicoValidator : AbstractValidator<CriarServicoRequest>
 {
-    public CreateServicoValidator()
+    public CriarServicoValidator()
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(160);
         RuleFor(x => x.ValorBase).GreaterThanOrEqualTo(0);
@@ -13,9 +13,9 @@ public sealed class CreateServicoValidator : AbstractValidator<CreateServicoRequ
     }
 }
 
-public sealed class UpdateServicoValidator : AbstractValidator<UpdateServicoRequest>
+public sealed class AtualizarServicoValidator : AbstractValidator<AtualizarServicoRequest>
 {
-    public UpdateServicoValidator()
+    public AtualizarServicoValidator()
     {
         RuleFor(x => x.Nome).NotEmpty().MaximumLength(160);
         RuleFor(x => x.ValorBase).GreaterThanOrEqualTo(0);

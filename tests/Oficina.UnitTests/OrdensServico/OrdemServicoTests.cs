@@ -9,12 +9,13 @@ namespace Oficina.UnitTests.OrdensServico;
 // geracao de orcamento, baixa logica de peca, finalizacao e entrega).
 public class OrdemServicoTests
 {
+    private static readonly Guid Loja = Guid.NewGuid();
     private static readonly Guid Cliente = Guid.NewGuid();
     private static readonly Guid Veiculo = Guid.NewGuid();
 
     private static OrdemServico OsEmDiagnostico()
     {
-        var os = new OrdemServico(Cliente, Veiculo);
+        var os = new OrdemServico(Loja, Cliente, Veiculo);
         os.IniciarDiagnostico();
         return os;
     }
@@ -31,7 +32,7 @@ public class OrdemServicoTests
     [Fact]
     public void Criar_DeveIniciarComoRecebida()
     {
-        var os = new OrdemServico(Cliente, Veiculo);
+        var os = new OrdemServico(Loja, Cliente, Veiculo);
         os.Status.Should().Be(StatusOS.Recebida);
         os.CriadaEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
@@ -39,7 +40,7 @@ public class OrdemServicoTests
     [Fact]
     public void Criar_SemCliente_DeveLancar()
     {
-        var acao = () => new OrdemServico(Guid.Empty, Veiculo);
+        var acao = () => new OrdemServico(Loja, Guid.Empty, Veiculo);
         acao.Should().Throw<DomainException>();
     }
 
@@ -93,7 +94,7 @@ public class OrdemServicoTests
     {
         var os = OsAguardandoAprovacao();
         var acao = () => os.IniciarDiagnostico();
-        acao.Should().Throw<InvalidStatusTransitionException>();
+        acao.Should().Throw<TransicaoStatusInvalidaException>();
     }
 
     [Fact]
@@ -134,6 +135,6 @@ public class OrdemServicoTests
         var os = OsAguardandoAprovacao();
         os.AprovarOrcamento();
         var acao = () => os.EntregarVeiculo();
-        acao.Should().Throw<InvalidStatusTransitionException>();
+        acao.Should().Throw<TransicaoStatusInvalidaException>();
     }
 }

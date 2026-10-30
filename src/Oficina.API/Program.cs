@@ -2,18 +2,32 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using Oficina.API.HealthChecks;
 using Oficina.API.Middlewares;
+using Oficina.API.Seguranca;
 using Oficina.Application;
+using Oficina.Application.Abstractions;
 using Oficina.Infrastructure;
 using Oficina.Infrastructure.Persistence;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MVC controllers
-builder.Services.AddControllers();
+// Logs estruturados em JSON no stdout (coletados pelo New Relic), enriquecidos com CorrelationId
+builder.Host.UseSerilog((context, config) => config
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("service", "oficina-api")
+    .Enrich.WithProperty("environment", context.HostingEnvironment.EnvironmentName)
+    .WriteTo.Console(new RenderedCompactJsonFormatter()));
 
-// Camadas Application (casos de uso + validators) e Infrastructure (EF/Postgres, repositorios)
+builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
+
+// Camadas Application (casos de uso + validators) e Infrastructure (EF/Postgres, SNS, New Relic, JWT)
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IUsuarioAtual, UsuarioAtual>();
+builder.Services.Configure<WebhookOptions>(builder.Configuration.GetSection("ExternalApproval"));
 
 // Swagger / OpenAPI com suporte a Bearer JWT
 builder.Services.AddEndpointsApiExplorer();
@@ -23,7 +37,8 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Oficina Mecanica API",
         Version = "v1",
-        Description = "Sistema Integrado de Atendimento e Execucao de Servicos (MVP - Tech Challenge FIAP)."
+        Description = "Ordens de servico da rede de oficinas (Tech Challenge FIAP - Fase 3). " +
+                      "Obtenha o token em POST /auth/cpf (cliente) ou POST /auth/login (funcionario) no API Gateway."
     });
 
     var jwtScheme = new OpenApiSecurityScheme
@@ -43,25 +58,41 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// AuthN/AuthZ (JWT) sao configurados em AddInfrastructure
-
 // Health checks: liveness valida o processo; readiness tambem valida o PostgreSQL.
 builder.Services.AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgresql", tags: new[] { "ready" });
 
 var app = builder.Build();
 
-// Cria/migra o schema e popula seeds no startup (MVP). Em producao, prefira migrations.
-using (var scope = app.Services.CreateScope())
+// Migrations + seed. No Kubernetes rodam uma unica vez num Job antes do deploy (argumento --migrar),
+// evitando que varias replicas migrem ao mesmo tempo; localmente rodam no startup.
+var somenteMigrar = args.Contains("--migrar");
+if (somenteMigrar || app.Configuration.GetValue("Banco:MigrarNoStartup", true))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<OficinaDbContext>();
     await DbInitializer.InitializeAsync(db);
+    if (somenteMigrar)
+    {
+        app.Logger.LogInformation("Migrations e seed aplicados; encerrando (modo --migrar).");
+        return;
+    }
 }
 
-// Tratamento global de excecoes -> respostas HTTP consistentes
+app.UseMiddleware<CorrelacaoMiddleware>();
+app.UseSerilogRequestLogging(options =>
+{
+    // Uma linha por requisicao com rota, status e duracao (latencia) - base dos dashboards de API
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} respondeu {StatusCode} em {Elapsed:0.0} ms";
+    options.GetLevel = (http, _, ex) => ex is not null || http.Response.StatusCode >= 500
+        ? Serilog.Events.LogEventLevel.Error
+        : http.Request.Path.StartsWithSegments("/health")
+            ? Serilog.Events.LogEventLevel.Verbose
+            : Serilog.Events.LogEventLevel.Information;
+});
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
+if (app.Configuration.GetValue("Swagger:Habilitado", true))
 {
     app.UseSwagger();
     app.UseSwaggerUI();

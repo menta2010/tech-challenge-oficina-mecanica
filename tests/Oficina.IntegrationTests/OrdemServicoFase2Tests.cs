@@ -102,13 +102,13 @@ public class OrdemServicoFase2Tests
     private async Task<OrdemServicoResponse> CriarOsEmAguardandoAprovacaoAsync(HttpClient client)
     {
         var cliente = await Post<ClienteResponse>(client, "/api/clientes",
-            new CreateClienteRequest("Cli F2", TestHelpers.GerarCpf(), null, null));
+            new CriarClienteRequest("Cli F2", TestHelpers.GerarCpf(), null, null));
         var veiculo = await Post<VeiculoResponse>(client, "/api/veiculos",
-            new CreateVeiculoRequest(cliente.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
+            new CriarVeiculoRequest(cliente.Id, TestHelpers.GerarPlaca(), "VW", "Gol", 2020));
         var servicos = await client.GetFromJsonAsync<List<Oficina.Application.Servicos.ServicoResponse>>("/api/servicos");
 
         var os = await Post<OrdemServicoResponse>(client, "/api/ordens-servico",
-            new CriarOrdemServicoRequest(cliente.Id, veiculo.Id));
+            new CriarOrdemServicoRequest(await client.ObterLojaCentroAsync(), cliente.Id, veiculo.Id));
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/iniciar-diagnostico", new { });
         await Post<OrdemServicoResponse>(client, $"/api/ordens-servico/{os.Id}/servicos",
             new AdicionarServicoRequest(servicos![0].Id));

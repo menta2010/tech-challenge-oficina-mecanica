@@ -1,0 +1,130 @@
+{
+  "name": "Oficina - Operacao (__AMBIENTE__)",
+  "description": "Ordens de servico, APIs, Kubernetes e saude da oficina. Gerado por docs/newrelic/importar.sh",
+  "permissions": "PUBLIC_READ_WRITE",
+  "pages": [
+    {
+      "name": "Negocio",
+      "widgets": [
+        {
+          "title": "Volume diario de ordens de servico (por loja)",
+          "layout": { "column": 1, "row": 1, "width": 8, "height": 3 },
+          "visualization": { "id": "viz.stacked-bar" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT count(*) FROM OrdemServicoEvento WHERE evento = 'criada' AND appName = 'oficina-api-__AMBIENTE__' FACET lojaId SINCE 30 days ago TIMESERIES 1 day" } ] }
+        },
+        {
+          "title": "OS abertas hoje",
+          "layout": { "column": 9, "row": 1, "width": 4, "height": 3 },
+          "visualization": { "id": "viz.billboard" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT count(*) AS 'OS abertas' FROM OrdemServicoEvento WHERE evento = 'criada' AND appName = 'oficina-api-__AMBIENTE__' SINCE today COMPARE WITH 1 day ago" } ] }
+        },
+        {
+          "title": "Tempo medio por status (minutos): Diagnostico, Execucao, Finalizacao",
+          "layout": { "column": 1, "row": 4, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.bar" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT average(minutosNoStatusAnterior) AS 'minutos' FROM OrdemServicoEvento WHERE evento = 'status_alterado' AND appName = 'oficina-api-__AMBIENTE__' AND statusAnterior IN ('EmDiagnostico', 'EmExecucao', 'Finalizada') FACET statusAnterior SINCE 7 days ago" } ] }
+        },
+        {
+          "title": "Transicoes de status por hora",
+          "layout": { "column": 7, "row": 4, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT count(*) FROM OrdemServicoEvento WHERE evento = 'status_alterado' AND appName = 'oficina-api-__AMBIENTE__' FACET status SINCE 1 day ago TIMESERIES 1 hour" } ] }
+        },
+        {
+          "title": "Falhas inesperadas no processamento de OS",
+          "layout": { "column": 1, "row": 7, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT count(*) FROM OrdemServicoEvento WHERE evento = 'falha' AND inesperada IS true AND appName = 'oficina-api-__AMBIENTE__' FACET operacao, erro SINCE 1 day ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Erros e falhas nas integracoes (banco, SNS, demais)",
+          "layout": { "column": 7, "row": 7, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.table" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT count(*) FROM TransactionError WHERE appName = 'oficina-api-__AMBIENTE__' FACET error.class, transactionName SINCE 1 day ago LIMIT 20" } ] }
+        }
+      ]
+    },
+    {
+      "name": "APIs",
+      "widgets": [
+        {
+          "title": "Latencia por endpoint (p50 / p95 / p99, ms)",
+          "layout": { "column": 1, "row": 1, "width": 8, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT percentile(duration * 1000, 50, 95, 99) FROM Transaction WHERE appName = 'oficina-api-__AMBIENTE__' SINCE 1 hour ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Taxa de erro (%)",
+          "layout": { "column": 9, "row": 1, "width": 4, "height": 3 },
+          "visualization": { "id": "viz.billboard" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT percentage(count(*), WHERE error IS true) AS 'erro %' FROM Transaction WHERE appName = 'oficina-api-__AMBIENTE__' SINCE 1 hour ago" } ] }
+        },
+        {
+          "title": "Endpoints mais lentos (p95, ms)",
+          "layout": { "column": 1, "row": 4, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.bar" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT percentile(duration * 1000, 95) AS 'p95 ms' FROM Transaction WHERE appName = 'oficina-api-__AMBIENTE__' FACET name SINCE 1 hour ago LIMIT 10" } ] }
+        },
+        {
+          "title": "Requisicoes por minuto",
+          "layout": { "column": 7, "row": 4, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.area" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT rate(count(*), 1 minute) FROM Transaction WHERE appName = 'oficina-api-__AMBIENTE__' SINCE 1 hour ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Logs de erro recentes (com correlationId)",
+          "layout": { "column": 1, "row": 7, "width": 12, "height": 3 },
+          "visualization": { "id": "viz.table" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT timestamp, level, message, context.CorrelationId FROM Log WHERE entity.name = 'oficina-api-__AMBIENTE__' AND level IN ('ERROR', 'Error', 'WARN', 'Warning') SINCE 1 hour ago LIMIT 50" } ] }
+        }
+      ]
+    },
+    {
+      "name": "Kubernetes e saude",
+      "widgets": [
+        {
+          "title": "CPU por pod da API (cores)",
+          "layout": { "column": 1, "row": 1, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT average(cpuUsedCores) FROM K8sContainerSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina' AND containerName = 'api' FACET podName SINCE 1 hour ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Memoria por pod da API (MB)",
+          "layout": { "column": 7, "row": 1, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT average(memoryWorkingSetBytes) / 1e6 FROM K8sContainerSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina' AND containerName = 'api' FACET podName SINCE 1 hour ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Replicas do HPA (atuais x desejadas)",
+          "layout": { "column": 1, "row": 4, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT latest(currentReplicas) AS 'atuais', latest(desiredReplicas) AS 'desejadas' FROM K8sHpaSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina' SINCE 1 hour ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Nos do cluster",
+          "layout": { "column": 7, "row": 4, "width": 6, "height": 3 },
+          "visualization": { "id": "viz.line" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT uniqueCount(nodeName) AS 'nos' FROM K8sNodeSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' SINCE 1 hour ago TIMESERIES" } ] }
+        },
+        {
+          "title": "Uptime externo (health check sintetico, %)",
+          "layout": { "column": 1, "row": 7, "width": 4, "height": 3 },
+          "visualization": { "id": "viz.billboard" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT percentage(count(*), WHERE result = 'SUCCESS') AS 'uptime %' FROM SyntheticCheck WHERE monitorName = 'oficina-health-__AMBIENTE__' SINCE 7 days ago" } ] }
+        },
+        {
+          "title": "Pods prontos (readiness)",
+          "layout": { "column": 5, "row": 7, "width": 4, "height": 3 },
+          "visualization": { "id": "viz.table" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT latest(isReady) AS 'pronto', latest(status) FROM K8sPodSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina' FACET podName SINCE 30 minutes ago" } ] }
+        },
+        {
+          "title": "Reinicios de containers",
+          "layout": { "column": 9, "row": 7, "width": 4, "height": 3 },
+          "visualization": { "id": "viz.billboard" },
+          "rawConfiguration": { "nrqlQueries": [ { "accountIds": [0], "query": "SELECT sum(restartCountDelta) AS 'reinicios' FROM K8sContainerSample WHERE clusterName = 'oficina-__AMBIENTE__-eks' AND namespaceName = 'oficina' SINCE 1 day ago" } ] }
+        }
+      ]
+    }
+  ]
+}

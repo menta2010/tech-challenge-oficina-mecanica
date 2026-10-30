@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 COPY *.sln ./
+COPY nuget.config ./
 COPY src/Oficina.Domain/*.csproj src/Oficina.Domain/
 COPY src/Oficina.Application/*.csproj src/Oficina.Application/
 COPY src/Oficina.Infrastructure/*.csproj src/Oficina.Infrastructure/
@@ -20,6 +21,9 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Usuario nao-root explicito (hardening - resolve o hotspot do SonarQube)
+# Agente New Relic (.NET) ja vem em /app/newrelic pelo pacote NuGet NewRelic.Agent.
+# Ele so e ativado pelas variaveis CORECLR_* e NEW_RELIC_* definidas no Deployment do Kubernetes.
+
 USER $APP_UID
 
 ENV ASPNETCORE_ENVIRONMENT=Docker
