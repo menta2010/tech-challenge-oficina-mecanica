@@ -19,7 +19,7 @@ A oficina passou a operar como uma **rede de unidades** e a aplicação saiu de 
 | [oficina-lambda-auth](https://github.com/menta2010/oficina-lambda-auth) | Lambdas de autenticação (CPF e funcionário) e job de inativação | .NET 8 + Terraform |
 | [oficina-app](https://github.com/menta2010/tech-challenge-oficina-mecanica) (este) | API de ordens de serviço | Docker → ECR → EKS |
 
-Todos usam GitHub Actions com `develop` → **homolog** e `main` → **prod**, branches protegidas e merge só por Pull Request.
+Todos usam GitHub Actions com `develop` → **homolog** e `master` → **prod**, branches protegidas e merge só por Pull Request.
 
 ## Diagrama de componentes
 
