@@ -17,7 +17,7 @@ Conteúdo-base do **PDF único** enviado no Portal do Aluno (prazo: 03/11/2026, 
 
 ### Vídeo
 
-`<link do YouTube ou Vimeo, público ou não listado, até 15 min>`
+https://www.youtube.com/watch?v=2AlPkdYqzqE
 
 ### Documentação
 
