@@ -21,7 +21,7 @@ Repositório 4 de 4 do Tech Challenge da Fase 3 (SOAT):
 | Arquitetura (componentes e sequência) | [docs/arquitetura.md](docs/arquitetura.md) |
 | RFCs e ADRs | [docs/rfc](docs/rfc/) · [docs/adr](docs/adr/) |
 | Observabilidade (dashboards e alertas) | [docs/observabilidade.md](docs/observabilidade.md) |
-| Vídeo de demonstração | `<link do YouTube/Vimeo>` |
+| Vídeo de demonstração | https://www.youtube.com/watch?v=2AlPkdYqzqE |
 
 O ambiente roda no AWS Academy: a URL só responde enquanto o laboratório está ligado.
 
